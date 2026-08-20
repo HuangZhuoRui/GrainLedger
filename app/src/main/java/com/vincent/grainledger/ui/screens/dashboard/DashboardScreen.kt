@@ -124,7 +124,7 @@ fun DashboardScreen(
     ) { targetYear, targetMonth ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // 1. 本月核心资产总览大卡片（含上月结余滚存）

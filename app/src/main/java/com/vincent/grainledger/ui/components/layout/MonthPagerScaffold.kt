@@ -327,20 +327,11 @@ fun MonthPagerScaffold(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 14.dp)
-                        .padding(bottom = 88.dp) // 为底部悬浮 TabBar 预留舒适空间
                         .graphicsLayer {
                             scaleX = cardScale
                             scaleY = cardScale
                             alpha = cardAlpha
                         }
-                        .shadow(
-                            elevation = 10.dp,
-                            shape = RoundedCornerShape(26.dp),
-                            spotColor = Color.Black.copy(alpha = 0.08f)
-                        )
-                        .clip(RoundedCornerShape(26.dp))
-                        .background(MiuixTheme.colorScheme.surface)
                 ) {
                     content(targetYear, targetMonth)
                 }
