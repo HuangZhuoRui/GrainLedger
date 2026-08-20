@@ -57,15 +57,15 @@ fun AmountText(
             )
         }
         Text(
-            text = "¥",
-            fontSize = symbolFontSize,
-            fontWeight = FontWeight.Medium,
-            color = color
-        )
-        Text(
             text = absAmount,
             fontSize = fontSize,
             fontWeight = fontWeight,
+            color = color
+        )
+        Text(
+            text = " ¥",
+            fontSize = symbolFontSize,
+            fontWeight = FontWeight.Medium,
             color = color
         )
     }

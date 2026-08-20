@@ -146,7 +146,7 @@ fun IncomeEnvelopeCard(
                             color = MiuixTheme.colorScheme.onSurfaceSecondary
                         )
                         Text(
-                            text = "+¥${MathFormulaEvaluator.formatAmount(incomeOverview.totalIncome)}",
+                            text = "+${MathFormulaEvaluator.formatAmount(incomeOverview.totalIncome)} ¥",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = MiuixGreen
@@ -218,7 +218,7 @@ fun IncomeEnvelopeCard(
                                 }
 
                                 Text(
-                                    text = "+¥${MathFormulaEvaluator.formatAmount(transaction.amount)}",
+                                    text = "+${MathFormulaEvaluator.formatAmount(transaction.amount)} ¥",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MiuixGreen

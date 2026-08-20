@@ -404,7 +404,7 @@ fun BookkeepingDialog(
                                             color = MiuixTheme.colorScheme.onSurface
                                         )
                                         Text(
-                                            text = "实际注入额度: ¥${MathFormulaEvaluator.formatAmount(matchedBudgetItem.actualAllocated)}",
+                                            text = "实际注入额度: ${MathFormulaEvaluator.formatAmount(matchedBudgetItem.actualAllocated)} ¥",
                                             fontSize = 11.sp,
                                             color = MiuixTheme.colorScheme.onSurfaceSecondary
                                         )
@@ -417,7 +417,7 @@ fun BookkeepingDialog(
                                             color = MiuixTheme.colorScheme.onSurfaceSecondary
                                         )
                                         Text(
-                                            text = "¥${MathFormulaEvaluator.formatAmount(matchedBudgetItem.balance)}",
+                                            text = "${MathFormulaEvaluator.formatAmount(matchedBudgetItem.balance)} ¥",
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = if (matchedBudgetItem.balance < 0) MiuixRed else MiuixGreen

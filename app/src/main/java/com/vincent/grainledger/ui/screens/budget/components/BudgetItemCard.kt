@@ -85,15 +85,15 @@ fun BudgetItemCard(
             Text(
                 text = if (isIncome) {
                     if (budgetItem.quantity > 1.0) {
-                        "单价 ¥${MathFormulaEvaluator.formatAmount(budgetItem.unitPrice)} × ${budgetItem.quantity} = 预估 ¥${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)}"
+                        "单价 ${MathFormulaEvaluator.formatAmount(budgetItem.unitPrice)} ¥ × ${budgetItem.quantity} = 预估 ${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)} ¥"
                     } else {
-                        "预估收入: ¥${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)}"
+                        "预估收入: ${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)} ¥"
                     }
                 } else {
                     if (budgetItem.quantity > 1.0) {
-                        "单价 ¥${MathFormulaEvaluator.formatAmount(budgetItem.unitPrice)} × ${budgetItem.quantity} = 总价 ¥${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)}"
+                        "单价 ${MathFormulaEvaluator.formatAmount(budgetItem.unitPrice)} ¥ × ${budgetItem.quantity} = 总价 ${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)} ¥"
                     } else {
-                        "预算总价: ¥${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)}"
+                        "预算总价: ${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)} ¥"
                     }
                 },
                 fontSize = 11.5.sp,
@@ -114,7 +114,7 @@ fun BudgetItemCard(
                             color = MiuixTheme.colorScheme.onSurfaceSecondary
                         )
                         Text(
-                            text = "+¥${MathFormulaEvaluator.formatAmount(budgetItem.actualAllocated)}",
+                            text = "+${MathFormulaEvaluator.formatAmount(budgetItem.actualAllocated)} ¥",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = MiuixGreen
@@ -140,7 +140,7 @@ fun BudgetItemCard(
                         )
                     }
                     Text(
-                        text = "已花 ¥${MathFormulaEvaluator.formatAmount(budgetItem.actualSpent)} / 注入 ¥${MathFormulaEvaluator.formatAmount(budgetItem.actualAllocated)}",
+                        text = "已花 ${MathFormulaEvaluator.formatAmount(budgetItem.actualSpent)} ¥ / 注入 ${MathFormulaEvaluator.formatAmount(budgetItem.actualAllocated)} ¥",
                         fontSize = 11.sp,
                         color = MiuixTheme.colorScheme.onSurfaceSecondary
                     )

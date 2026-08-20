@@ -149,9 +149,9 @@ fun BudgetEnvelopeCard(
                         }
                         Text(
                             text = if (isIncomeCategory) {
-                                "计划入账 ¥${MathFormulaEvaluator.formatAmount(categoryOverview.categoryActualAllocated)} (累加至总资金池)"
+                                "计划入账 ${MathFormulaEvaluator.formatAmount(categoryOverview.categoryActualAllocated)} ¥ (累加至总资金池)"
                             } else {
-                                "已消费 ¥${MathFormulaEvaluator.formatAmount(categoryOverview.categoryActualSpent)} / 额度 ¥${MathFormulaEvaluator.formatAmount(categoryOverview.categoryActualAllocated)}"
+                                "已消费 ${MathFormulaEvaluator.formatAmount(categoryOverview.categoryActualSpent)} ¥ / 额度 ${MathFormulaEvaluator.formatAmount(categoryOverview.categoryActualAllocated)} ¥"
                             },
                             fontSize = 12.sp,
                             color = MiuixTheme.colorScheme.onSurfaceSecondary
@@ -172,9 +172,9 @@ fun BudgetEnvelopeCard(
                         )
                         Text(
                             text = if (isIncomeCategory) {
-                                "+¥${MathFormulaEvaluator.formatAmount(categoryOverview.categoryActualAllocated)}"
+                                "+${MathFormulaEvaluator.formatAmount(categoryOverview.categoryActualAllocated)} ¥"
                             } else {
-                                "¥${MathFormulaEvaluator.formatAmount(categoryOverview.categoryBalance)}"
+                                "${MathFormulaEvaluator.formatAmount(categoryOverview.categoryBalance)} ¥"
                             },
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
@@ -240,9 +240,9 @@ fun BudgetEnvelopeCard(
                                 )
                                 Text(
                                     text = if (budgetItem.quantity > 1.0) {
-                                        "单价 ¥${MathFormulaEvaluator.formatAmount(budgetItem.unitPrice)} × ${budgetItem.quantity}"
+                                        "单价 ${MathFormulaEvaluator.formatAmount(budgetItem.unitPrice)} ¥ × ${budgetItem.quantity}"
                                     } else {
-                                        "预算总价 ¥${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)}"
+                                        "预算总价 ${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)} ¥"
                                     },
                                     fontSize = 11.sp,
                                     color = MiuixTheme.colorScheme.onSurfaceSecondary
@@ -251,13 +251,13 @@ fun BudgetEnvelopeCard(
 
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
-                                    text = "剩余 ¥${MathFormulaEvaluator.formatAmount(budgetItem.balance)}",
+                                    text = "剩余 ${MathFormulaEvaluator.formatAmount(budgetItem.balance)} ¥",
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (budgetItem.balance < 0) MiuixRed else MiuixTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "已花 ¥${MathFormulaEvaluator.formatAmount(budgetItem.actualSpent)} / 加入 ¥${MathFormulaEvaluator.formatAmount(budgetItem.actualAllocated)}",
+                                    text = "已花 ${MathFormulaEvaluator.formatAmount(budgetItem.actualSpent)} ¥ / 加入 ${MathFormulaEvaluator.formatAmount(budgetItem.actualAllocated)} ¥",
                                     fontSize = 11.sp,
                                     color = MiuixTheme.colorScheme.onSurfaceSecondary
                                 )

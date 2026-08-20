@@ -81,7 +81,7 @@ fun TransactionDailyCard(
                 ) {
                     if (dayExpense > 0.0) {
                         Text(
-                            text = "支出 -¥${MathFormulaEvaluator.formatAmount(dayExpense)}",
+                            text = "支出 -${MathFormulaEvaluator.formatAmount(dayExpense)} ¥",
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MiuixRed
@@ -89,7 +89,7 @@ fun TransactionDailyCard(
                     }
                     if (dayIncome > 0.0) {
                         Text(
-                            text = "入账 +¥${MathFormulaEvaluator.formatAmount(dayIncome)}",
+                            text = "入账 +${MathFormulaEvaluator.formatAmount(dayIncome)} ¥",
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MiuixGreen

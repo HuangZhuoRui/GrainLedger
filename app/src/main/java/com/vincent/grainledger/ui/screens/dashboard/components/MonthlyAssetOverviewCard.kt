@@ -97,9 +97,9 @@ fun MonthlyAssetOverviewCard(
             val bannerBg = if (isPositiveRollover) MiuixGreen.copy(alpha = 0.12f) else MiuixRed.copy(alpha = 0.12f)
             val bannerColor = if (isPositiveRollover) MiuixGreen else MiuixRed
             val bannerText = if (isPositiveRollover)
-                "🌱 含上月结余滚存: +¥${MathFormulaEvaluator.formatAmount(monthlyOverview.rolloverFromPreviousMonth)}（已自动结转至本月资金池）"
+                "🌱 含上月结余滚存: +${MathFormulaEvaluator.formatAmount(monthlyOverview.rolloverFromPreviousMonth)} ¥（已自动结转至本月资金池）"
             else
-                "⚠️ 含上月赤字结转: -¥${MathFormulaEvaluator.formatAmount(-monthlyOverview.rolloverFromPreviousMonth)}（已自动结转至本月资金池）"
+                "⚠️ 含上月赤字结转: -${MathFormulaEvaluator.formatAmount(-monthlyOverview.rolloverFromPreviousMonth)} ¥（已自动结转至本月资金池）"
 
             Box(
                 modifier = Modifier

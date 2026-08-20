@@ -104,9 +104,9 @@ fun TransactionItemRow(
         ) {
             Text(
                 text = if (isIncome) {
-                    "+¥${MathFormulaEvaluator.formatAmount(record.amount)}"
+                    "+${MathFormulaEvaluator.formatAmount(record.amount)} ¥"
                 } else {
-                    "-¥${MathFormulaEvaluator.formatAmount(record.absoluteAmount)}"
+                    "-${MathFormulaEvaluator.formatAmount(record.absoluteAmount)} ¥"
                 },
                 fontSize = 15.5.sp,
                 fontWeight = FontWeight.Bold,
@@ -118,13 +118,13 @@ fun TransactionItemRow(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = if (isIncome) "项额 ¥${MathFormulaEvaluator.formatAmount(record.itemRemaining)}" else "项余 ¥${MathFormulaEvaluator.formatAmount(record.itemRemaining)}",
+                    text = if (isIncome) "项额 ${MathFormulaEvaluator.formatAmount(record.itemRemaining)} ¥" else "项余 ${MathFormulaEvaluator.formatAmount(record.itemRemaining)} ¥",
                     fontSize = 10.5.sp,
                     color = if (isIncome) MiuixGreen else if (record.itemRemaining < 0) MiuixRed else MiuixGreen,
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = if (isIncome) "类额 ¥${MathFormulaEvaluator.formatAmount(record.categoryRemaining)}" else "类余 ¥${MathFormulaEvaluator.formatAmount(record.categoryRemaining)}",
+                    text = if (isIncome) "类额 ${MathFormulaEvaluator.formatAmount(record.categoryRemaining)} ¥" else "类余 ${MathFormulaEvaluator.formatAmount(record.categoryRemaining)} ¥",
                     fontSize = 10.5.sp,
                     color = if (isIncome) MiuixGreen else if (record.categoryRemaining < 0) MiuixRed else MiuixTheme.colorScheme.onSurfaceSecondary
                 )

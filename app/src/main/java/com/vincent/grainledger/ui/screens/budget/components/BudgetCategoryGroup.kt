@@ -78,9 +78,9 @@ fun BudgetCategoryGroup(
 
                 Text(
                     text = if (isIncome) {
-                        "预计收入 ¥${MathFormulaEvaluator.formatAmount(groupTotalAllocated)}"
+                        "预计收入 ${MathFormulaEvaluator.formatAmount(groupTotalAllocated)} ¥"
                     } else {
-                        "注入 ¥${MathFormulaEvaluator.formatAmount(groupTotalAllocated)} / 结余 ¥${MathFormulaEvaluator.formatAmount(groupTotalBalance)}"
+                        "注入 ${MathFormulaEvaluator.formatAmount(groupTotalAllocated)} ¥ / 结余 ${MathFormulaEvaluator.formatAmount(groupTotalBalance)} ¥"
                     },
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,

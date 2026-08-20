@@ -129,7 +129,7 @@ fun CapitalBalanceCard(
                         color = MiuixTheme.colorScheme.onSurfaceSecondary
                     )
                     Text(
-                        text = "¥${MathFormulaEvaluator.formatAmount(balanceCheckResult.targetBenchmarkFund)}",
+                        text = "${MathFormulaEvaluator.formatAmount(balanceCheckResult.targetBenchmarkFund)} ¥",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MiuixTheme.colorScheme.onSurface
@@ -143,7 +143,7 @@ fun CapitalBalanceCard(
                         color = MiuixTheme.colorScheme.onSurfaceSecondary
                     )
                     Text(
-                        text = "¥${MathFormulaEvaluator.formatAmount(balanceCheckResult.allocatedTotalFund)}",
+                        text = "${MathFormulaEvaluator.formatAmount(balanceCheckResult.allocatedTotalFund)} ¥",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MiuixTheme.colorScheme.onSurface
@@ -157,7 +157,7 @@ fun CapitalBalanceCard(
                         color = MiuixTheme.colorScheme.onSurfaceSecondary
                     )
                     Text(
-                        text = "¥${MathFormulaEvaluator.formatAmount(balanceCheckResult.balanceDifference)}",
+                        text = "${MathFormulaEvaluator.formatAmount(balanceCheckResult.balanceDifference)} ¥",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = statusColor

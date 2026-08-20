@@ -92,7 +92,7 @@ fun TransactionTreeScreen(
                 val record = pendingDeleteRecord!!
                 val isIncome = record.amount > 0
                 val typeName = if (isIncome) "入账" else "支出"
-                val formattedAmount = if (isIncome) "+¥${MathFormulaEvaluator.formatAmount(record.amount)}" else "-¥${MathFormulaEvaluator.formatAmount(record.absoluteAmount)}"
+                val formattedAmount = if (isIncome) "+${MathFormulaEvaluator.formatAmount(record.amount)} ¥" else "-${MathFormulaEvaluator.formatAmount(record.absoluteAmount)} ¥"
                 ConfirmDialog(
                     title = "删除${typeName}记录",
                     message = "确定要删除【${record.categoryName} - ${record.detailName}】金额 ${formattedAmount} 的这笔${typeName}记录吗？删除后可用结余将自动反算回补。",

@@ -67,7 +67,7 @@ fun TransactionMonthSummaryCard(
                         color = MiuixTheme.colorScheme.onSurfaceSecondary
                     )
                     Text(
-                        text = "-¥${MathFormulaEvaluator.formatAmount(totalExpense)}",
+                        text = "-${MathFormulaEvaluator.formatAmount(totalExpense)} ¥",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MiuixRed
@@ -82,7 +82,7 @@ fun TransactionMonthSummaryCard(
                         color = MiuixTheme.colorScheme.onSurfaceSecondary
                     )
                     Text(
-                        text = "+¥${MathFormulaEvaluator.formatAmount(totalIncome)}",
+                        text = "+${MathFormulaEvaluator.formatAmount(totalIncome)} ¥",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MiuixGreen
@@ -106,7 +106,7 @@ fun TransactionMonthSummaryCard(
                         color = MiuixTheme.colorScheme.onSurfaceSecondary
                     )
                     Text(
-                        text = if (netBalance >= 0) "+¥${MathFormulaEvaluator.formatAmount(netBalance)}" else "-¥${MathFormulaEvaluator.formatAmount(-netBalance)}",
+                        text = if (netBalance >= 0) "+${MathFormulaEvaluator.formatAmount(netBalance)} ¥" else "-${MathFormulaEvaluator.formatAmount(-netBalance)} ¥",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (netBalance >= 0) MiuixGreen else MiuixRed
