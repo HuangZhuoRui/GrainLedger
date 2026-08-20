@@ -68,7 +68,6 @@ class LedgerRepository(context: Context) {
         val monthKey = Pair(year, month)
         budgetItemsCache.remove(monthKey)
         transactionsCache.remove(monthKey)
-        balanceCheckCache.remove(monthKey)
         availableMonthsCache.set(null)
 
         // 历史发生变动，波及当前月及以后所有月份的链式滚存结果，予以精准失效
@@ -76,6 +75,13 @@ class LedgerRepository(context: Context) {
             it.first > year || (it.first == year && it.second >= month)
         }.forEach {
             monthlyOverviewCache.remove(it)
+        }
+
+        // 资金池配平数据同步精准失效当前月及后续波及月份
+        balanceCheckCache.keys.filter {
+            it.first > year || (it.first == year && it.second >= month)
+        }.forEach {
+            balanceCheckCache.remove(it)
         }
     }
 
@@ -529,20 +535,27 @@ class LedgerRepository(context: Context) {
     }
 
     /**
-     * 资金池配平健康检查（内存缓存加速）。
+     * 资金池配平健康检查（内存缓存加速 + 全动态联动）。
+     *
+     * 目标资金池基准为当月支出规划总额（总规划预算），
+     * 各项已分配总额为当月所有支出大类实际注入分配之和，
+     * 差额用于检验各细项实际注入金额是否与预算规划完全平衡。
      */
-    suspend fun getBalanceCheck(year: Int, month: Int, targetBenchmarkFund: Double = 10000.0): BalanceCheckResult = withContext(Dispatchers.IO) {
+    suspend fun getBalanceCheck(year: Int, month: Int): BalanceCheckResult = withContext(Dispatchers.IO) {
         val key = Pair(year, month)
-        balanceCheckCache.computeIfAbsent(key) {
-            val budgetItems = budgetItemDao.getBudgetItemsByMonth(year, month)
-            val allocatedTotal = BigDecimal(budgetItems.sumOf { it.actualAllocated }).setScale(2, RoundingMode.HALF_UP).toDouble()
-            val difference = BigDecimal(targetBenchmarkFund - allocatedTotal).setScale(2, RoundingMode.HALF_UP).toDouble()
+        balanceCheckCache[key] ?: run {
+            val overview = getMonthlyOverview(year, month)
+            val targetBenchmark = overview.totalPlannedBudget
+            val allocatedTotal = BigDecimal(overview.categoryOverviewList.sumOf { it.categoryActualAllocated }).setScale(2, RoundingMode.HALF_UP).toDouble()
+            val difference = BigDecimal(targetBenchmark - allocatedTotal).setScale(2, RoundingMode.HALF_UP).toDouble()
 
-            BalanceCheckResult(
-                targetBenchmarkFund = targetBenchmarkFund,
+            val result = BalanceCheckResult(
+                targetBenchmarkFund = targetBenchmark,
                 allocatedTotalFund = allocatedTotal,
                 balanceDifference = difference
             )
+            balanceCheckCache[key] = result
+            result
         }
     }
 

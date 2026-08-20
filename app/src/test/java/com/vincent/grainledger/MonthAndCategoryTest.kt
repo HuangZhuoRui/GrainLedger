@@ -300,4 +300,35 @@ class MonthAndCategoryTest {
         val m9Funds = 4000.0 + 500.0 + cumulativeRollover
         assertEquals(14500.0, m9Funds, 0.001)
     }
+
+    @Test
+    fun testDynamicCapitalBalanceCheck() {
+        // 场景 1：9月份总规划 1675.20，实际注入 1625.20 -> 差额 50.00 待分配
+        val sepPlanned = 1675.20
+        val sepAllocated = 1625.20
+        val sepBalanceCheck = com.vincent.grainledger.data.model.BalanceCheckResult(
+            targetBenchmarkFund = sepPlanned,
+            allocatedTotalFund = sepAllocated
+        )
+        assertEquals(50.00, sepBalanceCheck.balanceDifference, 0.001)
+        assertTrue(sepBalanceCheck.hasUnallocatedFund)
+        org.junit.Assert.assertFalse(sepBalanceCheck.isBalanced)
+        org.junit.Assert.assertFalse(sepBalanceCheck.isOverAllocated)
+
+        // 场景 2：用户加预算使得注入金额正好等于规划额度 -> 完美配平
+        val balancedCheck = com.vincent.grainledger.data.model.BalanceCheckResult(
+            targetBenchmarkFund = 1675.20,
+            allocatedTotalFund = 1675.20
+        )
+        assertEquals(0.00, balancedCheck.balanceDifference, 0.001)
+        assertTrue(balancedCheck.isBalanced)
+
+        // 场景 3：实际注入金额超出规划额度 -> 超额分配警示
+        val overAllocatedCheck = com.vincent.grainledger.data.model.BalanceCheckResult(
+            targetBenchmarkFund = 1000.00,
+            allocatedTotalFund = 1200.00
+        )
+        assertEquals(-200.00, overAllocatedCheck.balanceDifference, 0.001)
+        assertTrue(overAllocatedCheck.isOverAllocated)
+    }
 }
