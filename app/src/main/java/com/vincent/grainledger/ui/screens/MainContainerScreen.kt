@@ -2,10 +2,6 @@ package com.vincent.grainledger.ui.screens
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.DateRange
@@ -31,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +55,7 @@ import com.vincent.grainledger.ui.theme.MiuixAnimation
 import com.vincent.grainledger.ui.theme.MiuixBlue
 import com.vincent.grainledger.ui.theme.MiuixShapes
 import com.vincent.grainledger.ui.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -75,7 +75,8 @@ sealed class NavigationTab(val index: Int, val title: String, val icon: ImageVec
 /**
  * 应用主容器界面 (MainContainerScreen)。
  *
- * 组织四大核心页面（看板、预算、流水、设置）的切换展示，
+ * 组织四大核心页面（看板、预算、流水、设置）的水平连续平移动画与手势切换，
+ * 跨页签跳转支持完整连续滚动动画（如 A -> B -> C -> D），
  * 容纳全局记账弹窗与预算编辑弹窗、启动静默检查更新弹窗。
  *
  * @param viewModel 全局视图模型
@@ -87,6 +88,7 @@ fun MainContainerScreen(
     onNavigateToUpdate: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     val currentYear by viewModel.currentYear.collectAsState()
     val currentMonth by viewModel.currentMonth.collectAsState()
@@ -95,6 +97,8 @@ fun MainContainerScreen(
     val downloadProgress by viewModel.downloadProgress.collectAsState()
 
     val selectedTabIndex by viewModel.selectedTabIndex.collectAsState()
+    val pagerState = rememberPagerState(initialPage = selectedTabIndex) { 4 }
+
     var showBookkeepingDialog by remember { mutableStateOf(false) }
     var editingBudgetItem by remember { mutableStateOf<BudgetItem?>(null) }
     var showBudgetEditDialog by remember { mutableStateOf(false) }
@@ -102,6 +106,23 @@ fun MainContainerScreen(
     // 冷启动时静默检查更新，仅在发现新版本时触发弹窗提示
     LaunchedEffect(Unit) {
         viewModel.checkUpdateOnStartup(BuildConfig.VERSION_NAME)
+    }
+
+    // 监听 HorizontalPager 滑动结束，同步单一数据源 ViewModel 的 selectedTabIndex
+    LaunchedEffect(pagerState.settledPage) {
+        if (selectedTabIndex != pagerState.settledPage) {
+            viewModel.setSelectedTabIndex(pagerState.settledPage)
+        }
+    }
+
+    // 监听 ViewModel selectedTabIndex 变更，驱动 HorizontalPager 进行完整平移动画
+    LaunchedEffect(selectedTabIndex) {
+        if (pagerState.currentPage != selectedTabIndex) {
+            pagerState.animateScrollToPage(
+                page = selectedTabIndex,
+                animationSpec = MiuixAnimation.springSmooth()
+            )
+        }
     }
 
     // 拦截系统返回键关闭弹窗
@@ -125,36 +146,14 @@ fun MainContainerScreen(
         applyStatusBarPadding = true,
         applyNavigationBarPadding = false
     ) {
-        // 页面切换容器（纯左右平移无渐变）
-        AnimatedContent(
-            targetState = selectedTabIndex,
-            transitionSpec = {
-                if (targetState > initialState) {
-                    slideInHorizontally(
-                        initialOffsetX = { fullWidth -> fullWidth },
-                        animationSpec = MiuixAnimation.springSmooth()
-                    ).togetherWith(
-                        slideOutHorizontally(
-                            targetOffsetX = { fullWidth -> -fullWidth },
-                            animationSpec = MiuixAnimation.springSmooth()
-                        )
-                    )
-                } else {
-                    slideInHorizontally(
-                        initialOffsetX = { fullWidth -> -fullWidth },
-                        animationSpec = MiuixAnimation.springSmooth()
-                    ).togetherWith(
-                        slideOutHorizontally(
-                            targetOffsetX = { fullWidth -> fullWidth },
-                            animationSpec = MiuixAnimation.springSmooth()
-                        )
-                    )
-                }
-            },
-            label = "主页签切换",
-            modifier = Modifier.fillMaxSize()
-        ) { index ->
-            when (index) {
+        // 水平全量多页连续平移容器 (A -> B -> C -> D 完整滑动)
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            beyondViewportPageCount = 3,
+            userScrollEnabled = true
+        ) { pageIndex ->
+            when (pageIndex) {
                 0 -> DashboardScreen(
                     viewModel = viewModel,
                     onOpenBookkeeping = { showBookkeepingDialog = true },
@@ -208,7 +207,7 @@ fun MainContainerScreen(
                 )
 
                 tabList.forEach { tab ->
-                    val isSelected = (selectedTabIndex == tab.index)
+                    val isSelected = (pagerState.targetPage == tab.index)
                     Column(
                         modifier = Modifier
                             .clickable(
@@ -216,6 +215,12 @@ fun MainContainerScreen(
                                 indication = null
                             ) {
                                 viewModel.setSelectedTabIndex(tab.index)
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(
+                                        page = tab.index,
+                                        animationSpec = MiuixAnimation.springSmooth()
+                                    )
+                                }
                             }
                             .padding(horizontal = 14.dp, vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
