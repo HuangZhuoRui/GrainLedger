@@ -301,6 +301,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _currentMonth.value = targetMonth
                 _toastMessage.value = "已成功创建 ${targetYear}年${targetMonth}月 账本！"
                 loadAllData()
+            } else {
+                _toastMessage.value = "${targetYear}年${targetMonth}月 账本已存在，无法重复添加！"
             }
         }
     }

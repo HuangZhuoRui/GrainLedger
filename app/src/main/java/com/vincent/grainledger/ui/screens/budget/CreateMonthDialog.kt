@@ -147,7 +147,13 @@ fun CreateMonthDialog(
                                         color = if (isSelected) MiuixBlue else MiuixTheme.colorScheme.surfaceVariant,
                                         shape = MiuixShapes.SmallSquircle
                                     )
-                                    .clickable { selectedYear = yr }
+                                    .clickable {
+                                        selectedYear = yr
+                                        val firstAvailable = (1..12).firstOrNull { !availableMonths.contains(Pair(yr, it)) }
+                                        if (firstAvailable != null) {
+                                            selectedMonth = firstAvailable
+                                        }
+                                    }
                                     .padding(horizontal = 14.dp, vertical = 7.dp)
                             ) {
                                 Text(
@@ -179,20 +185,20 @@ fun CreateMonthDialog(
                         ) {
                             rowMonths.forEach { m ->
                                 val isExisting = availableMonths.contains(Pair(selectedYear, m))
-                                val isSelected = (m == selectedMonth)
+                                val isSelected = (m == selectedMonth) && !isExisting
 
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
                                         .background(
                                             color = when {
+                                                isExisting -> MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
                                                 isSelected -> MiuixBlue
-                                                isExisting -> MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                                 else -> MiuixTheme.colorScheme.surfaceVariant
                                             },
                                             shape = MiuixShapes.SmallSquircle
                                         )
-                                        .clickable { selectedMonth = m }
+                                        .clickable(enabled = !isExisting) { selectedMonth = m }
                                         .padding(vertical = 10.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -201,13 +207,17 @@ fun CreateMonthDialog(
                                             text = "${m}月",
                                             fontSize = 13.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) Color.White else MiuixTheme.colorScheme.onSurface
+                                            color = when {
+                                                isExisting -> MiuixTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                                isSelected -> Color.White
+                                                else -> MiuixTheme.colorScheme.onSurface
+                                            }
                                         )
                                         if (isExisting) {
                                             Text(
                                                 text = "已存在",
                                                 fontSize = 9.sp,
-                                                color = if (isSelected) Color.White.copy(alpha = 0.8f) else MiuixTheme.colorScheme.onSurfaceSecondary
+                                                color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.5f)
                                             )
                                         }
                                     }
@@ -267,19 +277,39 @@ fun CreateMonthDialog(
                 }
 
                 // 4. 上月结余自动滚存提示
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(MiuixShapes.SmallSquircle)
-                        .background(MiuixGreen.copy(alpha = 0.12f))
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = "🌱 资金智能结转：如果上个月有剩余未用完的结余资金，系统将自动作为【上月结余滚存】计入新月份的总资金池与可用结余供继续使用。",
-                        fontSize = 12.sp,
-                        color = MiuixGreen,
-                        lineHeight = 17.sp
-                    )
+                val isCurrentSelectionExisting = availableMonths.contains(Pair(selectedYear, selectedMonth))
+
+                // 4. 提示信息
+                if (isCurrentSelectionExisting) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MiuixShapes.SmallSquircle)
+                            .background(MiuixTheme.colorScheme.surfaceVariant)
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "⚠️ ${selectedYear}年${selectedMonth}月 账本已存在，请切换选择其他未开启的月份。",
+                            fontSize = 12.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                            lineHeight = 17.sp
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MiuixShapes.SmallSquircle)
+                            .background(MiuixGreen.copy(alpha = 0.12f))
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "🌱 资金智能结转：如果上个月有剩余未用完的结余资金，系统将自动作为【上月结余滚存】计入新月份的总资金池与可用结余供继续使用。",
+                            fontSize = 12.sp,
+                            color = MiuixGreen,
+                            lineHeight = 17.sp
+                        )
+                    }
                 }
 
                 // 5. 底部操作按钮
@@ -299,15 +329,20 @@ fun CreateMonthDialog(
 
                     Button(
                         onClick = {
-                            onCreateMonth(selectedYear, selectedMonth, copyBudgetFromCurrent)
-                            onDismissRequest()
+                            if (!isCurrentSelectionExisting) {
+                                onCreateMonth(selectedYear, selectedMonth, copyBudgetFromCurrent)
+                                onDismissRequest()
+                            }
                         },
                         modifier = Modifier.weight(1.2f),
-                        colors = ButtonDefaults.buttonColors(color = MiuixBlue)
+                        enabled = !isCurrentSelectionExisting,
+                        colors = ButtonDefaults.buttonColors(
+                            color = if (!isCurrentSelectionExisting) MiuixBlue else MiuixTheme.colorScheme.surfaceVariant
+                        )
                     ) {
                         Text(
-                            text = "立即开启",
-                            color = Color.White,
+                            text = if (!isCurrentSelectionExisting) "立即开启" else "月份已存在",
+                            color = if (!isCurrentSelectionExisting) Color.White else MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.6f),
                             fontWeight = FontWeight.Bold
                         )
                     }

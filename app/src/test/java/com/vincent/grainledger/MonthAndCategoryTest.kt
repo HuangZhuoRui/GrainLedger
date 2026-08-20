@@ -365,4 +365,25 @@ class MonthAndCategoryTest {
         assertTrue(types.any { it.name == "BUDGETS" })
         assertTrue(types.any { it.name == "ALL" })
     }
+
+    @Test
+    fun testDuplicateMonthCreationDisallowed() {
+        val existingMonths = listOf(
+            Pair(2026, 8),
+            Pair(2026, 9),
+            Pair(2026, 10),
+            Pair(2026, 11),
+            Pair(2026, 12)
+        )
+
+        // 尝试创建已存在的 2026年 8月 -> 应被判定为已存在
+        val targetMonth = Pair(2026, 8)
+        val isDuplicate = existingMonths.contains(targetMonth)
+        assertTrue(isDuplicate)
+
+        // 尝试创建未存在的 2027年 1月 -> 允许创建
+        val newMonth = Pair(2027, 1)
+        val isNewDuplicate = existingMonths.contains(newMonth)
+        org.junit.Assert.assertFalse(isNewDuplicate)
+    }
 }

@@ -221,7 +221,7 @@ class LedgerRepository(context: Context) {
     }
 
     /**
-     * 新建月份账本，支持从基准月份智能复制克隆预算细项结构。
+     * 新建月份账本，支持从基准月份智能复制克隆预算细项结构。若目标月份已存在则直接拦截并返回 false。
      */
     suspend fun createMonth(
         targetYear: Int,
@@ -230,6 +230,12 @@ class LedgerRepository(context: Context) {
         sourceMonth: Int,
         copyBudget: Boolean
     ): Boolean = withContext(Dispatchers.IO) {
+        val existingMonths = getAvailableMonths()
+        if (existingMonths.contains(Pair(targetYear, targetMonth))) {
+            // 目标月份已存在，禁止重复创建，防止数据覆盖或细项重复
+            return@withContext false
+        }
+
         database.runInTransaction { db ->
             if (copyBudget) {
                 val sourceItems = budgetItemDao.getBudgetItemsByMonth(sourceYear, sourceMonth)
