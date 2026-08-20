@@ -1,13 +1,10 @@
 package com.vincent.grainledger.ui.screens.dashboard.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,7 +24,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 /**
  * 月度核心资产总览大卡片 (MonthlyAssetOverviewCard)。
  *
- * 展示当月剩余总结余、资金状态徽章以及规划总价、注入资金、已消费的三列核心指标。
+ * 展示当月剩余可用总结余、资金状态徽章以及规划总价、资金总量（基础注入+入账）、累计入账与已消费的核心指标。
  *
  * @param currentYear 当前年份
  * @param currentMonth 当前月份
@@ -41,6 +38,8 @@ fun MonthlyAssetOverviewCard(
     monthlyOverview: MonthlyOverview,
     modifier: Modifier = Modifier
 ) {
+    val hasIncome = monthlyOverview.totalIncome > 0.0
+
     MiuixSectionCard(
         modifier = modifier,
         cornerRadius = 22.dp,
@@ -80,7 +79,7 @@ fun MonthlyAssetOverviewCard(
             )
         }
 
-        // 三列核心指标：规划预算、实际加入、已消费
+        // 核心指标行
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -93,7 +92,7 @@ fun MonthlyAssetOverviewCard(
                 )
                 AmountText(
                     amount = monthlyOverview.totalPlannedBudget,
-                    fontSize = 15.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = MiuixTheme.colorScheme.onSurface
                 )
@@ -101,16 +100,32 @@ fun MonthlyAssetOverviewCard(
 
             Column {
                 Text(
-                    text = "实际注入",
+                    text = "资金池总量",
                     fontSize = 11.sp,
                     color = MiuixTheme.colorScheme.onSurfaceSecondary
                 )
                 AmountText(
                     amount = monthlyOverview.totalActualAllocated,
-                    fontSize = 15.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = MiuixBlue
                 )
+            }
+
+            if (hasIncome) {
+                Column {
+                    Text(
+                        text = "本月入账",
+                        fontSize = 11.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary
+                    )
+                    AmountText(
+                        amount = monthlyOverview.totalIncome,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MiuixGreen
+                    )
+                }
             }
 
             Column {
@@ -121,7 +136,7 @@ fun MonthlyAssetOverviewCard(
                 )
                 AmountText(
                     amount = monthlyOverview.totalActualSpent,
-                    fontSize = 15.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = MiuixRed
                 )

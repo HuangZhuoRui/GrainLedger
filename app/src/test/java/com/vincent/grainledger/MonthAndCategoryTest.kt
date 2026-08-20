@@ -228,4 +228,26 @@ class MonthAndCategoryTest {
         val totalBalance = totalFunds - spent
         assertEquals(11400.0, totalBalance, 0.001)
     }
+
+    @Test
+    fun testExpenseOnlyInBudgetPlanningAndIncomeInBookkeeping() {
+        val categories = listOf(
+            BudgetCategory(1, "餐饮饮食", "food", 0xFF3482FFL, 1, isIncome = false),
+            BudgetCategory(2, "房租物业", "home", 0xFFFF9500L, 2, isIncome = false),
+            BudgetCategory(3, "工资薪金", "salary", 0xFF34C759L, 3, isIncome = true),
+            BudgetCategory(4, "兼职收入", "work", 0xFF00C7BEL, 4, isIncome = true)
+        )
+
+        // 验证分类管理中同时包含支出类与收入类
+        val expenseCats = categories.filter { !it.isIncome }
+        val incomeCats = categories.filter { it.isIncome }
+        assertEquals(2, expenseCats.size)
+        assertEquals(2, incomeCats.size)
+
+        // 验证加预算仅允许支出类
+        assertEquals(listOf("餐饮饮食", "房租物业"), expenseCats.map { it.categoryName })
+
+        // 验证看板记一笔支持从收入类中选取
+        assertEquals(listOf("工资薪金", "兼职收入"), incomeCats.map { it.categoryName })
+    }
 }

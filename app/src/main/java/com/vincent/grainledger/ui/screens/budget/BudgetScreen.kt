@@ -41,8 +41,8 @@ import com.vincent.grainledger.ui.viewmodel.MainViewModel
 /**
  * 预算管理与规划页面 (BudgetScreen)。
  *
- * 遵循单一数据源 (SSOT) 原则，全响应式展示当前月份的预算细项、
- * 按大类聚合分组卡片与统计汇总，支持可视化新增月份、大类管理、新增/编辑细项与删除。
+ * 遵循单一数据源 (SSOT) 原则，全响应式展示当前月份的支出预算细项、
+ * 按支出大类聚合分组卡片与统计汇总，支持可视化新增月份、分类全生命周期管理、新增/编辑预算细项与删除。
  *
  * @param viewModel 全局视图模型
  * @param modifier 外部修饰符
@@ -59,14 +59,19 @@ fun BudgetScreen(
     val allCategories by viewModel.allCategories.collectAsState()
     val categoryMap = remember(allCategories) { allCategories.associateBy { it.categoryName } }
 
+    // 仅保留支出类预算项
+    val expenseBudgetItems = remember(budgetItemList, categoryMap) {
+        budgetItemList.filter { categoryMap[it.categoryName]?.isIncome != true }
+    }
+
     var editingBudgetItem by remember { mutableStateOf<BudgetItem?>(null) }
     var showEditDialog by remember { mutableStateOf(false) }
     var showCreateMonthDialog by remember { mutableStateOf(false) }
     var showCategoryManagementDialog by remember { mutableStateOf(false) }
 
     // 按大类对预算项进行分组
-    val categoryGroupMap = remember(budgetItemList) {
-        budgetItemList.groupBy { it.categoryName }
+    val categoryGroupMap = remember(expenseBudgetItems) {
+        expenseBudgetItems.groupBy { it.categoryName }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -79,7 +84,7 @@ fun BudgetScreen(
             item {
                 PageHeader(
                     title = "预算管理",
-                    subtitle = "规划每月开支细项与资金注入额度",
+                    subtitle = "规划每月支出预算细项与资金注入额度",
                     actionSlot = {
                         TextButton(
                             onClick = { showCategoryManagementDialog = true }
@@ -112,15 +117,15 @@ fun BudgetScreen(
 
             // 3. 统计汇总头部卡片
             item {
-                BudgetSummaryCard(budgetItemList = budgetItemList)
+                BudgetSummaryCard(budgetItemList = expenseBudgetItems)
             }
 
             // 4. 大类分组预算列表
-            if (budgetItemList.isEmpty()) {
+            if (expenseBudgetItems.isEmpty()) {
                 item {
                     EmptyStateView(
                         title = "本月暂无预算规划",
-                        message = "点击右下角按钮添加第一个预算细项吧"
+                        message = "点击右下角按钮添加第一个支出预算细项吧"
                     )
                 }
             } else {
@@ -171,13 +176,14 @@ fun BudgetScreen(
         }
     }
 
-    // 预算编辑/新增弹窗
+    // 预算编辑/新增弹窗（仅展示支出大类）
     if (showEditDialog) {
+        val expenseCategories = allCategories.filter { !it.isIncome }
         EditBudgetItemDialog(
             targetItem = editingBudgetItem,
             year = currentYear,
             month = currentMonth,
-            categoryList = allCategories,
+            categoryList = expenseCategories,
             onSave = { savedItem ->
                 viewModel.saveBudgetItem(savedItem)
                 showEditDialog = false
@@ -208,7 +214,7 @@ fun BudgetScreen(
         )
     }
 
-    // 预算分类全生命周期管理弹窗
+    // 分类全生命周期管理弹窗（包含支出类与收入类管理）
     if (showCategoryManagementDialog) {
         CategoryManagementDialog(
             categoryList = allCategories,

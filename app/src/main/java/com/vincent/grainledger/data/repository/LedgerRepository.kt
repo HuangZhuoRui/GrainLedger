@@ -214,55 +214,30 @@ class LedgerRepository(context: Context) {
      */
     suspend fun recordTransaction(transaction: TransactionRecord): Long = withContext(Dispatchers.IO) {
         database.runInTransaction { db ->
-            // 1. 查找对应的预算/收入项
-            val matchedItem = budgetItemDao.findBudgetItem(
-                transaction.year,
-                transaction.month,
-                transaction.categoryName,
-                transaction.detailName,
-                db
-            )
-
-            // 支出金额（负数，例如 -180.59）; 收入金额（正数，例如 3000.0）
-            val amountDelta = transaction.amount
-            val isIncome = amountDelta > 0
+            val isIncome = transaction.amount > 0
 
             val computedItemRemaining: Double
-            if (isIncome) {
-                // 收入入账：收入无需预设硬上限，在“记一笔”发生时直接动态累加到该细项与总资金池
-                val currentAllocated = matchedItem?.actualAllocated ?: 0.0
-                val newAllocated = BigDecimal(currentAllocated + amountDelta).setScale(2, RoundingMode.HALF_UP).toDouble()
-                computedItemRemaining = newAllocated
+            val computedCategoryRemaining: Double
 
-                if (matchedItem != null) {
-                    budgetItemDao.updateAllocatedAndBalance(
-                        itemId = matchedItem.itemId,
-                        actualAllocated = newAllocated,
-                        balance = newAllocated,
-                        db = db
-                    )
-                } else {
-                    // 若尚未预先建立该收入条目，自动根据记账流水生成对应的收入细项
-                    val newItem = BudgetItem(
-                        itemId = 0L,
-                        year = transaction.year,
-                        month = transaction.month,
-                        categoryName = transaction.categoryName,
-                        detailName = transaction.detailName,
-                        unitPrice = amountDelta,
-                        quantity = 1.0,
-                        totalPrice = amountDelta,
-                        actualAllocated = newAllocated,
-                        funder = transaction.funder,
-                        actualSpent = 0.0,
-                        balance = newAllocated,
-                        remark = transaction.remark
-                    )
-                    budgetItemDao.insertBudgetItem(newItem, db)
-                }
+            if (isIncome) {
+                // 收入入账：收入属于单笔入账流水，不属于预设预算细项
+                val monthTransactions = transactionDao.getTransactionsByMonth(transaction.year, transaction.month)
+                    .filter { it.categoryName == transaction.categoryName && it.amount > 0 }
+                val previousCategoryIncome = monthTransactions.sumOf { it.amount }
+                val newCategoryIncome = BigDecimal(previousCategoryIncome + transaction.amount).setScale(2, RoundingMode.HALF_UP).toDouble()
+
+                computedItemRemaining = BigDecimal(transaction.amount).setScale(2, RoundingMode.HALF_UP).toDouble()
+                computedCategoryRemaining = newCategoryIncome
             } else {
-                // 支出记账：增加已消费，扣减结余
-                val spentIncrease = -amountDelta
+                // 支出记账：从预算细项中扣减已消费与结余
+                val matchedItem = budgetItemDao.findBudgetItem(
+                    transaction.year,
+                    transaction.month,
+                    transaction.categoryName,
+                    transaction.detailName,
+                    db
+                )
+                val spentIncrease = -transaction.amount // 负数转为正数消费
                 if (matchedItem != null) {
                     val newActualSpent = matchedItem.actualSpent + spentIncrease
                     val newBalance = matchedItem.actualAllocated - newActualSpent
@@ -277,21 +252,16 @@ class LedgerRepository(context: Context) {
                 } else {
                     computedItemRemaining = 0.0
                 }
+
+                val categoryItems = budgetItemDao.getBudgetItemsByMonth(transaction.year, transaction.month)
+                    .filter { it.categoryName == transaction.categoryName }
+
+                val categoryTotalAllocated = categoryItems.sumOf { it.actualAllocated }
+                val categoryTotalSpent = categoryItems.sumOf { it.actualSpent }
+                computedCategoryRemaining = BigDecimal(categoryTotalAllocated - categoryTotalSpent).setScale(2, RoundingMode.HALF_UP).toDouble()
             }
 
-            // 2. 计算大类剩余/总额
-            val categoryItems = budgetItemDao.getBudgetItemsByMonth(transaction.year, transaction.month)
-                .filter { it.categoryName == transaction.categoryName }
-
-            val categoryTotalAllocated = categoryItems.sumOf { it.actualAllocated }
-            val categoryTotalSpent = categoryItems.sumOf { it.actualSpent }
-            val computedCategoryRemaining = if (isIncome) {
-                BigDecimal(categoryTotalAllocated).setScale(2, RoundingMode.HALF_UP).toDouble()
-            } else {
-                BigDecimal(categoryTotalAllocated - categoryTotalSpent).setScale(2, RoundingMode.HALF_UP).toDouble()
-            }
-
-            // 3. 写入流水表
+            // 写入流水表
             val recordToSave = transaction.copy(
                 itemRemaining = computedItemRemaining,
                 categoryRemaining = computedCategoryRemaining
@@ -310,26 +280,16 @@ class LedgerRepository(context: Context) {
             val targetRecord = transactionDao.getTransactionById(recordId, db)
             if (targetRecord != null) {
                 val isIncome = targetRecord.amount > 0
-                val matchedItem = budgetItemDao.findBudgetItem(
-                    targetRecord.year,
-                    targetRecord.month,
-                    targetRecord.categoryName,
-                    targetRecord.detailName,
-                    db
-                )
-
-                if (matchedItem != null) {
-                    if (isIncome) {
-                        // 收入流水删除：回退扣减该收入项的累加入账金额
-                        val restoredAllocated = BigDecimal(matchedItem.actualAllocated - targetRecord.amount).setScale(2, RoundingMode.HALF_UP).toDouble().coerceAtLeast(0.0)
-                        budgetItemDao.updateAllocatedAndBalance(
-                            itemId = matchedItem.itemId,
-                            actualAllocated = restoredAllocated,
-                            balance = restoredAllocated,
-                            db = db
-                        )
-                    } else {
-                        // 支出流水删除：回退扣减已消费金额，恢复可用结余
+                if (!isIncome) {
+                    // 支出流水删除：回退扣减已消费金额，恢复可用结余
+                    val matchedItem = budgetItemDao.findBudgetItem(
+                        targetRecord.year,
+                        targetRecord.month,
+                        targetRecord.categoryName,
+                        targetRecord.detailName,
+                        db
+                    )
+                    if (matchedItem != null) {
                         val restoredSpent = (matchedItem.actualSpent - (-targetRecord.amount)).coerceAtLeast(0.0)
                         val restoredBalance = matchedItem.actualAllocated - restoredSpent
                         budgetItemDao.updateSpentAndBalance(
@@ -357,39 +317,38 @@ class LedgerRepository(context: Context) {
     suspend fun getMonthlyOverview(year: Int, month: Int): MonthlyOverview = withContext(Dispatchers.IO) {
         val budgetItems = getBudgetItemsByMonth(year, month)
         val categoryMap = getAllCategories().associateBy { it.categoryName }
+        val transactions = getTransactionsByMonth(year, month)
 
-        val totalPlanned = BigDecimal(budgetItems.sumOf { it.totalPrice }).setScale(2, RoundingMode.HALF_UP).toDouble()
-        val totalAllocated = BigDecimal(budgetItems.sumOf { it.actualAllocated }).setScale(2, RoundingMode.HALF_UP).toDouble()
+        // 仅支出类预算细项
+        val expenseBudgetItems = budgetItems.filter { categoryMap[it.categoryName]?.isIncome != true }
 
-        // 区分收入类分类与支出类分类
-        val incomeItems = budgetItems.filter { categoryMap[it.categoryName]?.isIncome == true }
-        val expenseItems = budgetItems.filter { categoryMap[it.categoryName]?.isIncome != true }
+        val totalPlanned = BigDecimal(expenseBudgetItems.sumOf { it.totalPrice }).setScale(2, RoundingMode.HALF_UP).toDouble()
+        val totalExpenseAllocated = BigDecimal(expenseBudgetItems.sumOf { it.actualAllocated }).setScale(2, RoundingMode.HALF_UP).toDouble()
 
-        val totalIncome = BigDecimal(incomeItems.sumOf { it.actualAllocated }).setScale(2, RoundingMode.HALF_UP).toDouble()
-        val totalSpent = BigDecimal(expenseItems.sumOf { it.actualSpent }).setScale(2, RoundingMode.HALF_UP).toDouble()
-        // 当月可用结余 = 总资金量（基础预算注入 + 收入类金额） - 总支出消费
-        val totalBalance = BigDecimal(totalAllocated - totalSpent).setScale(2, RoundingMode.HALF_UP).toDouble()
+        // 收入来自当月流水中的真实入账
+        val totalIncome = BigDecimal(transactions.filter { it.amount > 0 }.sumOf { it.amount }).setScale(2, RoundingMode.HALF_UP).toDouble()
+        // 支出来自消费总额
+        val totalSpent = BigDecimal(expenseBudgetItems.sumOf { it.actualSpent }).setScale(2, RoundingMode.HALF_UP).toDouble()
 
-        // 按分类聚合
-        val categoryGroups = budgetItems.groupBy { it.categoryName }
+        // 当月总资金池总量 = 支出预算基础分配 + 真实入账总额
+        val totalActualAllocated = BigDecimal(totalExpenseAllocated + totalIncome).setScale(2, RoundingMode.HALF_UP).toDouble()
+        // 当月可用总结余 = 总资金池总量 - 总消费支出
+        val totalBalance = BigDecimal(totalActualAllocated - totalSpent).setScale(2, RoundingMode.HALF_UP).toDouble()
+
+        // 按支出大类聚合信封卡片
+        val categoryGroups = expenseBudgetItems.groupBy { it.categoryName }
         val categoryOverviewList = categoryGroups.map { (categoryName, items) ->
-            val catDef = categoryMap[categoryName]
-            val isIncomeCat = catDef?.isIncome ?: false
             val budgetTotal = BigDecimal(items.sumOf { it.totalPrice }).setScale(2, RoundingMode.HALF_UP).toDouble()
             val allocatedTotal = BigDecimal(items.sumOf { it.actualAllocated }).setScale(2, RoundingMode.HALF_UP).toDouble()
             val spentTotal = BigDecimal(items.sumOf { it.actualSpent }).setScale(2, RoundingMode.HALF_UP).toDouble()
-            val balanceTotal = if (isIncomeCat) {
-                BigDecimal(allocatedTotal).setScale(2, RoundingMode.HALF_UP).toDouble()
-            } else {
-                BigDecimal(allocatedTotal - spentTotal).setScale(2, RoundingMode.HALF_UP).toDouble()
-            }
+            val balanceTotal = BigDecimal(allocatedTotal - spentTotal).setScale(2, RoundingMode.HALF_UP).toDouble()
             CategoryOverview(
                 categoryName = categoryName,
                 categoryTotalBudget = budgetTotal,
                 categoryActualAllocated = allocatedTotal,
                 categoryActualSpent = spentTotal,
                 categoryBalance = balanceTotal,
-                isIncome = isIncomeCat,
+                isIncome = false,
                 budgetItemList = items
             )
         }.sortedBy { categoryMap[it.categoryName]?.sortOrder ?: 99 }
@@ -398,7 +357,7 @@ class LedgerRepository(context: Context) {
             year = year,
             month = month,
             totalPlannedBudget = totalPlanned,
-            totalActualAllocated = totalAllocated,
+            totalActualAllocated = totalActualAllocated,
             totalActualSpent = totalSpent,
             totalBalance = totalBalance,
             totalIncome = totalIncome,
