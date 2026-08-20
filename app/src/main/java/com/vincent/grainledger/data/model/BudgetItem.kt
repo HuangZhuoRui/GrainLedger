@@ -27,13 +27,13 @@ data class BudgetItem(
     val month: Int,
     val categoryName: String,
     val detailName: String,
-    val unitPrice: Double,
+    val unitPrice: Double = 0.0,
     val quantity: Double = 1.0,
     val totalPrice: Double = unitPrice * quantity,
     val actualAllocated: Double = totalPrice,
     val funder: String = "默认账户",
     val actualSpent: Double = 0.0,
-    val balance: Double = actualAllocated - actualSpent,
+    val balance: Double = 0.0,
     val remark: String = ""
 ) {
     /**

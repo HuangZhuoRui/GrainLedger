@@ -78,7 +78,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val monthlyOverview: StateFlow<MonthlyOverview> = _monthlyOverview.asStateFlow()
 
     // 资金池配平状态（对应草稿页）
-    private val _balanceCheckResult = MutableStateFlow(BalanceCheckResult(10000.0, 0.0, 10000.0))
+    private val _balanceCheckResult = MutableStateFlow(BalanceCheckResult(0.0, 0.0, 0.0))
     val balanceCheckResult: StateFlow<BalanceCheckResult> = _balanceCheckResult.asStateFlow()
 
     // 当前月份下的所有预算细项

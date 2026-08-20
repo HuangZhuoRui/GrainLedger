@@ -128,9 +128,11 @@ fun DashboardScreen(
     ) { targetYear, targetMonth ->
         // 瞬间从全量预载内存缓存中读取当前目标月份的数据，0 延迟秒级呈现
         val itemOverview = monthlyOverviewMap[Pair(targetYear, targetMonth)] ?: MonthlyOverview(targetYear, targetMonth)
+        val allocatedSum = itemOverview.categoryOverviewList.sumOf { it.categoryActualAllocated }
         val itemBalanceCheck = balanceCheckMap[Pair(targetYear, targetMonth)] ?: BalanceCheckResult(
             targetBenchmarkFund = itemOverview.totalPlannedBudget,
-            allocatedTotalFund = itemOverview.categoryOverviewList.sumOf { it.categoryActualAllocated }
+            allocatedTotalFund = allocatedSum,
+            balanceDifference = itemOverview.totalPlannedBudget - allocatedSum
         )
 
         LazyColumn(

@@ -24,7 +24,7 @@ data class MonthlyOverview(
     val totalPlannedBudget: Double = 0.0,
     val totalActualAllocated: Double = 0.0,
     val totalActualSpent: Double = 0.0,
-    val totalBalance: Double = totalActualAllocated - totalActualSpent,
+    val totalBalance: Double = 0.0,
     val totalIncome: Double = 0.0,
     val rolloverFromPreviousMonth: Double = 0.0,
     val categoryOverviewList: List<CategoryOverview> = emptyList(),
@@ -47,7 +47,7 @@ data class CategoryOverview(
     val categoryTotalBudget: Double = 0.0,
     val categoryActualAllocated: Double = 0.0,
     val categoryActualSpent: Double = 0.0,
-    val categoryBalance: Double = categoryActualAllocated - categoryActualSpent,
+    val categoryBalance: Double = 0.0,
     val isIncome: Boolean = false,
     val budgetItemList: List<BudgetItem> = emptyList()
 ) {
@@ -82,12 +82,12 @@ data class IncomeCategoryOverview(
  * 对应 Excel 表格中的《草稿页》配平公式：`总启动金 - SUM(实际加入) = 0`。
  * 用于检测分配的资金是否超额或尚有未分配额度。
  *
- * @property targetBenchmarkFund 例如设定的启动资金（如 10000.00）
+ * @property targetBenchmarkFund 例如设定的基准预算资金
  * @property allocatedTotalFund 已在预算项中实际加入的金额之和
  * @property balanceDifference targetBenchmarkFund - allocatedTotalFund（等于 0 代表完美配平）
  */
 data class BalanceCheckResult(
-    val targetBenchmarkFund: Double = 10000.0,
+    val targetBenchmarkFund: Double = 0.0,
     val allocatedTotalFund: Double = 0.0,
     val balanceDifference: Double = targetBenchmarkFund - allocatedTotalFund
 ) {
