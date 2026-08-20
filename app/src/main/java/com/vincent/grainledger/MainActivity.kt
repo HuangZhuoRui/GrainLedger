@@ -5,13 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import com.vincent.grainledger.ui.screens.MainContainerScreen
+import com.vincent.grainledger.ui.navigation.AppNavHost
 import com.vincent.grainledger.ui.viewmodel.MainViewModel
 
 /**
  * 余粮主入口 Activity。
  *
- * 启用边到边沉浸式全屏布局，初始化全局 ViewModel 并渲染主容器组件。
+ * 启用边到边沉浸式全屏布局，初始化全局 ViewModel 并渲染全局导航图。
  */
 class MainActivity : ComponentActivity() {
 
@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MainContainerScreen(
+            AppNavHost(
                 viewModel = mainViewModel
             )
         }

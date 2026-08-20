@@ -1,5 +1,6 @@
 package com.vincent.grainledger.ui.screens.updater
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,6 +71,9 @@ fun UpdateScreen(
     viewModel: MainViewModel,
     onBack: () -> Unit
 ) {
+    // 监听系统返回键与手势，返回上一层设置页面
+    BackHandler(onBack = onBack)
+
     val context = LocalContext.current
     val currentAppVersion = BuildConfig.VERSION_NAME
     val updateCheckState by viewModel.updateCheckState.collectAsState()
