@@ -205,7 +205,7 @@ private fun CheckingView() {
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = "正在连接 GitHub 与自建高速代理分发节点",
+            text = "正在获取最新版本信息...",
             fontSize = 13.sp,
             color = MiuixTheme.colorScheme.onSurfaceSecondary
         )
@@ -272,36 +272,26 @@ private fun HasUpdateView(
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // 自建高速代理加速标签
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(MiuixGreen.copy(alpha = 0.12f))
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.RocketLaunch,
-                contentDescription = "高速加速",
-                tint = MiuixGreen,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "已就绪自建高速镜像加速分发",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = MiuixGreen
-            )
-            if (apkAsset != null && apkAsset.formattedSize.isNotBlank()) {
-                Spacer(modifier = Modifier.weight(1f))
+        if (apkAsset != null && apkAsset.formattedSize.isNotBlank()) {
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "安装包体积",
+                    fontSize = 12.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceSecondary
+                )
                 Text(
                     text = apkAsset.formattedSize,
                     fontSize = 12.sp,
-                    color = MiuixGreen,
+                    color = MiuixBlue,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -383,28 +373,45 @@ private fun HasUpdateView(
                 }
             }
         } else {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val targetDownloadUrl = if (acceleratedUrl.isNotBlank()) acceleratedUrl else (release.androidDownloadUrl ?: "")
+                            onStartDownload(targetDownloadUrl, fileName)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MiuixBlue)
+                    ) {
+                        Text(text = "加速下载", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = {
+                            val directUrl = release.androidDownloadUrl ?: ""
+                            onStartDownload(directUrl, fileName)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MiuixTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Text(text = "正常下载", color = MiuixTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                    }
+                }
+
                 OutlinedButton(
                     onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Text(text = "稍后再说", color = MiuixTheme.colorScheme.onSurfaceSecondary)
-                }
-
-                Button(
-                    onClick = {
-                        val targetDownloadUrl = if (acceleratedUrl.isNotBlank()) acceleratedUrl else (release.androidDownloadUrl ?: "")
-                        onStartDownload(targetDownloadUrl, fileName)
-                    },
-                    modifier = Modifier.weight(1.5f),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MiuixBlue)
-                ) {
-                    Text(text = "立即更新", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
 

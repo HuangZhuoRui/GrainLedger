@@ -285,15 +285,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // 当前正在下载的版本标签
+    private val _downloadingTagName = MutableStateFlow<String?>(null)
+    val downloadingTagName: StateFlow<String?> = _downloadingTagName.asStateFlow()
+
     /**
-     * 开始下载新版本 APK。
+     * 开始下载 APK。
      *
      * @param context Android 上下文
-     * @param downloadUrl 加速下载链接
+     * @param downloadUrl 下载链接（加速或官方链接）
      * @param fileName 安装包文件名
+     * @param tagName 当前版本标签（用于 UI 实时匹配下载进度）
      */
-    fun startDownloadApk(context: Context, downloadUrl: String, fileName: String) {
+    fun startDownloadApk(context: Context, downloadUrl: String, fileName: String, tagName: String? = null) {
         viewModelScope.launch {
+            _downloadingTagName.value = tagName
             val cacheDirectory = context.externalCacheDir ?: context.cacheDir
             val destinationApkFile = File(cacheDirectory, fileName)
 
@@ -308,6 +314,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (downloadSuccess && destinationApkFile.exists()) {
                 updaterService.installApk(context, destinationApkFile)
             }
+            if (!downloadSuccess) {
+                _downloadingTagName.value = null
+            }
         }
     }
 
@@ -316,6 +325,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun cancelDownload() {
         updaterService.cancelDownload()
+        _downloadingTagName.value = null
         _downloadProgress.value = DownloadProgress(status = DownloadStatus.CANCELED)
     }
 

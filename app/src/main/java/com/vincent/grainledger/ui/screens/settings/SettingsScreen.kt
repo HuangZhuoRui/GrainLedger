@@ -158,7 +158,7 @@ fun SettingsScreen(
                         icon = Icons.Default.SystemUpdate,
                         iconBackgroundColor = MiuixBlue,
                         primaryTitle = "检查应用更新与发布历史",
-                        secondaryTitle = "当前版本: v$currentAppVersion · 自建高速镜像分发",
+                        secondaryTitle = "当前版本: v$currentAppVersion",
                         badgeText = "进入",
                         onClick = onNavigateToUpdate
                     )
