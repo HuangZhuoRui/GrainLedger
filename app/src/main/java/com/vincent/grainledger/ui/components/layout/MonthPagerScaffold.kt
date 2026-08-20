@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -25,8 +26,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,9 +56,9 @@ import kotlin.math.absoluteValue
  *
  * 为【看板】、【预算】、【流水】三大核心页面提供统一的顶级视觉与交互架构：
  * 1. 顶部自适应居中月份进度轴：当前月份始终处于屏幕正中央，随手势 1:1 硬件加速平滑居中跟随，两侧月份等比缩小淡化；
- * 2. 屏幕边缘渐变羽化遮罩：两端平滑淡出，消除生硬截断割裂感；
- * 3. 线性缩放平移流式容器：左右滑动时当前页面线性缩小、新页面逐渐放大、归位刚好满尺寸；
- * 4. 彻底消除手势抽搐冲突与多余内边距问题。
+ * 2. 月份胶囊宽度充足且单行不换行，支持两位数月份（如 2026年12月）；
+ * 3. 屏幕边缘渐变羽化遮罩：两端平滑淡出，消除生硬截断割裂感；
+ * 4. 彻底消除手势反向拉回冲突与多余内边距问题。
  *
  * @param availableMonths 可用月份列表 (Pair<年份, 月份>)
  * @param currentYear 当前年份
@@ -104,19 +107,26 @@ fun MonthPagerScaffold(
         safeMonths.size
     }
 
-    // 仅在非用户滑动手势期间响应外部月份选择变更，避免冲突抽搐/拉回
+    // 记录 Pager 自身最后结算的页面，用于防止快速手势时被 ViewModel 回流状态误反向拉回
+    var lastSettledPage by remember { mutableIntStateOf(pagerState.currentPage) }
+
+    // 仅当外部（如点击弹窗新建月份、外部切换等）修改了月份且与当前 Pager 结算页不一致时才驱动滚动
     LaunchedEffect(currentMonthIndex) {
-        if (!pagerState.isScrollInProgress && pagerState.currentPage != currentMonthIndex) {
-            pagerState.animateScrollToPage(
-                page = currentMonthIndex,
-                animationSpec = MiuixAnimation.springSmooth()
-            )
+        if (currentMonthIndex != lastSettledPage && currentMonthIndex in safeMonths.indices) {
+            lastSettledPage = currentMonthIndex
+            if (pagerState.currentPage != currentMonthIndex) {
+                pagerState.animateScrollToPage(
+                    page = currentMonthIndex,
+                    animationSpec = MiuixAnimation.springSmooth()
+                )
+            }
         }
     }
 
-    // 监听 Pager 滑动结算完成，同步通知选中月份
+    // 监听用户手势滑动 Pager 结算完成，同步通知外部更新单一数据源
     LaunchedEffect(pagerState.settledPage) {
         if (pagerState.settledPage in safeMonths.indices) {
+            lastSettledPage = pagerState.settledPage
             val (sYear, sMonth) = safeMonths[pagerState.settledPage]
             if (sYear != currentYear || sMonth != currentMonth) {
                 onMonthSelected(sYear, sMonth)
@@ -125,8 +135,8 @@ fun MonthPagerScaffold(
     }
 
     // 计算顶部月份轴精确居中硬件平移位移 (1:1 动态响应滑动偏移，毫秒级始终居中)
-    val itemWidthDp = 96.dp
-    val spacingDp = 10.dp
+    val itemWidthDp = 114.dp
+    val spacingDp = 8.dp
     val itemWidthPx = with(density) { itemWidthDp.toPx() }
     val spacingPx = with(density) { spacingDp.toPx() }
     val stepPx = itemWidthPx + spacingPx
@@ -138,9 +148,8 @@ fun MonthPagerScaffold(
         }
     }
 
-    val translationXPx = remember(currentProgress, screenWidthPx, itemWidthPx, stepPx) {
-        (screenWidthPx / 2f) - (itemWidthPx / 2f) - (currentProgress * stepPx)
-    }
+    val safeProgress = currentProgress.coerceIn(0f, (safeMonths.size - 1).coerceAtLeast(0).toFloat())
+    val translationXPx = (screenWidthPx / 2f) - (itemWidthPx / 2f) - (safeProgress * stepPx)
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -219,7 +228,7 @@ fun MonthPagerScaffold(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     safeMonths.forEachIndexed { index, (year, month) ->
-                        val distance = (currentProgress - index).absoluteValue
+                        val distance = (safeProgress - index).absoluteValue
                         val scale = (1.0f - (distance * 0.18f)).coerceIn(0.82f, 1.0f)
                         val alpha = (1.0f - (distance * 0.45f)).coerceIn(0.38f, 1.0f)
                         val isCurrent = distance < 0.5f
@@ -252,9 +261,11 @@ fun MonthPagerScaffold(
                         ) {
                             Text(
                                 text = "${year}年${month}月",
-                                fontSize = if (isCurrent) 16.sp else 14.sp,
+                                fontSize = if (isCurrent) 15.sp else 13.sp,
                                 fontWeight = if (isCurrent) FontWeight.ExtraBold else FontWeight.Medium,
-                                color = if (isCurrent) MiuixBlue else MiuixTheme.colorScheme.onSurface
+                                color = if (isCurrent) MiuixBlue else MiuixTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
@@ -266,13 +277,13 @@ fun MonthPagerScaffold(
                                 .width(82.dp)
                                 .clip(MiuixShapes.SmallSquircle)
                                 .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) {
-                                onAddMonthClick()
-                            }
-                            .padding(vertical = 6.dp),
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) {
+                                    onAddMonthClick()
+                                }
+                                .padding(vertical = 6.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Row(
@@ -307,7 +318,11 @@ fun MonthPagerScaffold(
                     .weight(1f),
                 beyondViewportPageCount = 1,
                 pageSpacing = 10.dp,
-                userScrollEnabled = true
+                userScrollEnabled = true,
+                flingBehavior = PagerDefaults.flingBehavior(
+                    state = pagerState,
+                    snapPositionalThreshold = 0.25f
+                )
             ) { pageIndex ->
                 val (targetYear, targetMonth) = safeMonths[pageIndex]
 

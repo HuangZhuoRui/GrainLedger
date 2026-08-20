@@ -202,8 +202,8 @@ class LedgerRepository(context: Context) {
         if (combined.isNotEmpty()) {
             combined
         } else {
-            // 默认若为空则补充 2026 年 8~12 月
-            (8..12).map { Pair(2026, it) }
+            // 默认若为空则仅提供初始月份（2026年8月），其余月份由用户通过“加月份”按需新建
+            listOf(Pair(2026, 8))
         }
     }
 

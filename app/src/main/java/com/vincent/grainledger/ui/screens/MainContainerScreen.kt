@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -173,6 +175,22 @@ fun MainContainerScreen(
                     onNavigateToUpdate = onNavigateToUpdate
                 )
             }
+        }
+
+        // TabBar 切换动画进行中时，全局拦截触摸事件禁止任何人为滑动干涉，确保动画流畅抵达
+        if (pagerState.isScrollInProgress) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                    }
+            )
         }
 
         // 底部 MIUI 悬浮胶囊导航栏
