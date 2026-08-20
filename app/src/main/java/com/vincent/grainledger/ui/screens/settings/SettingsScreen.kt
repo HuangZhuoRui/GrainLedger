@@ -61,13 +61,15 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * 设置、主题偏好、检查更新与 Excel 导入导出管理页面。
  *
  * 提供标准 Excel 文件的双向互通导入导出、重置初始数据、
- * 暗色模式切换、自建高速分发检查更新与关于信息。
+ * 暗色模式切换、进入独立检查更新页面与关于信息。
  *
  * @param viewModel 全局主视图模型
+ * @param onNavigateToUpdate 导航至独立检查更新页面回调
  */
 @Composable
 fun SettingsScreen(
-    viewModel: MainViewModel
+    viewModel: MainViewModel,
+    onNavigateToUpdate: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val isProcessingFile by viewModel.isProcessingFile.collectAsState()
@@ -76,7 +78,6 @@ fun SettingsScreen(
     val downloadProgress by viewModel.downloadProgress.collectAsState()
 
     var showResetDialog by remember { mutableStateOf(false) }
-    var showUpdateDialog by remember { mutableStateOf(false) }
 
     val currentAppVersion = BuildConfig.VERSION_NAME
 
@@ -156,13 +157,10 @@ fun SettingsScreen(
                     SettingItemRow(
                         icon = Icons.Default.SystemUpdate,
                         iconBackgroundColor = MiuixBlue,
-                        primaryTitle = "检查应用更新",
-                        secondaryTitle = "当前版本: v$currentAppVersion (自建高速镜像加速分发)",
-                        badgeText = "检查",
-                        onClick = {
-                            showUpdateDialog = true
-                            viewModel.checkForUpdates(currentAppVersion)
-                        }
+                        primaryTitle = "检查应用更新与发布历史",
+                        secondaryTitle = "当前版本: v$currentAppVersion · 自建高速镜像分发",
+                        badgeText = "进入",
+                        onClick = onNavigateToUpdate
                     )
                 }
             }
@@ -385,27 +383,6 @@ fun SettingsScreen(
                 }
             }
         }
-    }
-
-    // 检查更新弹窗
-    if (showUpdateDialog && updateCheckState !is UpdateCheckState.Idle) {
-        UpdateCheckDialog(
-            checkState = updateCheckState,
-            downloadProgress = downloadProgress,
-            onStartDownload = { downloadUrl, fileName ->
-                viewModel.startDownloadApk(context, downloadUrl, fileName)
-            },
-            onCancelDownload = {
-                viewModel.cancelDownload()
-            },
-            onRetry = {
-                viewModel.checkForUpdates(currentAppVersion)
-            },
-            onDismiss = {
-                showUpdateDialog = false
-                viewModel.resetUpdateState()
-            }
-        )
     }
 
     // 重置数据确认弹窗

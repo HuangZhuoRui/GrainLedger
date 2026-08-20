@@ -3,6 +3,73 @@ package com.vincent.grainledger.data.updater
 import java.util.Locale
 
 /**
+ * 结构化更新日志解析模型。
+ *
+ * @property features 新增特性列表 (feat:)
+ * @property fixes 修复问题列表 (fix:)
+ * @property others 其他变更内容
+ */
+data class ParsedChangelog(
+    val features: List<String> = emptyList(),
+    val fixes: List<String> = emptyList(),
+    val others: List<String> = emptyList()
+) {
+    val hasCategorized: Boolean
+        get() = features.isNotEmpty() || fixes.isNotEmpty()
+
+    companion object {
+        fun parse(rawBody: String): ParsedChangelog {
+            val features = mutableListOf<String>()
+            val fixes = mutableListOf<String>()
+            val others = mutableListOf<String>()
+
+            val lines = rawBody.split('\n')
+            for (rawLine in lines) {
+                val line = rawLine.trim()
+                if (line.isEmpty() || line.startsWith("#")) continue
+
+                var content = line
+                if (content.startsWith("- ") || content.startsWith("* ")) {
+                    content = content.substring(2).trim()
+                }
+
+                val lower = content.lowercase(Locale.getDefault())
+                if (lower.startsWith("tmp:") || lower.startsWith("tmp：") || lower.startsWith("tmp ") ||
+                    lower.startsWith("temp:") || lower.startsWith("temp：") || lower.startsWith("temp ")) {
+                    continue
+                }
+
+                when {
+                    lower.startsWith("feat:") || lower.startsWith("feat：") -> {
+                        features.add(content.substring(5).trim())
+                    }
+                    lower.startsWith("feat ") -> {
+                        features.add(content.substring(5).trim())
+                    }
+                    lower.startsWith("feature:") || lower.startsWith("feature ") -> {
+                        features.add(content.substring(lower.indexOf("feature") + 7).trim())
+                    }
+                    lower.startsWith("fix:") || lower.startsWith("fix：") -> {
+                        fixes.add(content.substring(4).trim())
+                    }
+                    lower.startsWith("fix ") -> {
+                        fixes.add(content.substring(4).trim())
+                    }
+                    lower.startsWith("bugfix:") || lower.startsWith("bugfix ") -> {
+                        fixes.add(content.substring(lower.indexOf("bugfix") + 6).trim())
+                    }
+                    content.isNotEmpty() -> {
+                        others.add(content)
+                    }
+                }
+            }
+
+            return ParsedChangelog(features, fixes, others)
+        }
+    }
+}
+
+/**
  * GitHub Release 附件实体。
  *
  * @property id 附件唯一标识
@@ -56,6 +123,12 @@ data class GitHubRelease(
      */
     val androidDownloadUrl: String?
         get() = androidAsset?.browserDownloadUrl
+
+    /**
+     * 获取结构化解析的更新日志。
+     */
+    val parsedChangelog: ParsedChangelog
+        get() = ParsedChangelog.parse(body)
 }
 
 /**

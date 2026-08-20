@@ -44,6 +44,40 @@ class AppUpdaterService(
     }
 
     /**
+     * 静默检查更新（仅在检测到新版本时返回 HasUpdate，无更新或网络异常时返回 null，不打扰用户）。
+     *
+     * @param currentVersion 当前应用版本
+     * @return 存在新版本时返回 HasUpdate 状态，否则返回 null
+     */
+    suspend fun checkUpdateSilently(currentVersion: String): UpdateCheckState.HasUpdate? = withContext(Dispatchers.IO) {
+        try {
+            val releases = fetchReleases()
+            if (releases.isEmpty()) return@withContext null
+            val latest = releases.first()
+            if (isNewerVersion(latest.tagName, currentVersion)) {
+                val directDownloadUrl = latest.androidDownloadUrl ?: ""
+                val acceleratedUrl = getAcceleratedDownloadUrl(directDownloadUrl)
+                UpdateCheckState.HasUpdate(
+                    release = latest,
+                    currentVersion = currentVersion,
+                    acceleratedDownloadUrl = acceleratedUrl
+                )
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * 获取全部版本发布历史列表。
+     */
+    suspend fun fetchAllReleases(): List<GitHubRelease> = withContext(Dispatchers.IO) {
+        fetchReleases()
+    }
+
+    /**
      * 检查是否有新版本可用。
      *
      * @param currentVersion 当前应用版本（如 "1.0.0"）
@@ -74,7 +108,7 @@ class AppUpdaterService(
     /**
      * 拉取远端 Releases 列表（优先自建加速节点，失败则降级官方 GitHub API）。
      */
-    private fun fetchReleases(): List<GitHubRelease> {
+    fun fetchReleases(): List<GitHubRelease> {
         // 1. 优先尝试自建高速节点
         try {
             val proxyUrlString = "$ACCELERATE_BASE_URL/api/$repoName/releases"

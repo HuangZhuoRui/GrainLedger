@@ -14,6 +14,7 @@ import com.vincent.grainledger.data.repository.LedgerRepository
 import com.vincent.grainledger.data.updater.AppUpdaterService
 import com.vincent.grainledger.data.updater.DownloadProgress
 import com.vincent.grainledger.data.updater.DownloadStatus
+import com.vincent.grainledger.data.updater.GitHubRelease
 import com.vincent.grainledger.data.updater.UpdateCheckState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -230,6 +231,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _toastMessage.value = "导出出错: ${exception.localizedMessage}"
             } finally {
                 _isProcessingFile.value = false
+            }
+        }
+    }
+
+    // 历史版本列表流
+    private val _releaseHistoryList = MutableStateFlow<List<GitHubRelease>>(emptyList())
+    val releaseHistoryList: StateFlow<List<GitHubRelease>> = _releaseHistoryList.asStateFlow()
+
+    private val _isLoadingHistory = MutableStateFlow(false)
+    val isLoadingHistory: StateFlow<Boolean> = _isLoadingHistory.asStateFlow()
+
+    /**
+     * 应用冷启动时静默检查更新（若发现新版本则自动展示弹窗，无更新则保持静默不打扰用户）。
+     *
+     * @param currentVersion 当前版本
+     */
+    fun checkUpdateOnStartup(currentVersion: String) {
+        viewModelScope.launch {
+            val hasUpdateState = updaterService.checkUpdateSilently(currentVersion)
+            if (hasUpdateState != null) {
+                _updateCheckState.value = hasUpdateState
+            }
+        }
+    }
+
+    /**
+     * 拉取全量历史版本发布列表。
+     */
+    fun fetchReleaseHistory() {
+        viewModelScope.launch {
+            _isLoadingHistory.value = true
+            try {
+                val list = updaterService.fetchAllReleases()
+                _releaseHistoryList.value = list
+            } catch (_: Exception) {
+            } finally {
+                _isLoadingHistory.value = false
             }
         }
     }

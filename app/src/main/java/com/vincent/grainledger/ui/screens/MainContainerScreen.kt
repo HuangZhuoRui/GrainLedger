@@ -2,8 +2,11 @@ package com.vincent.grainledger.ui.screens
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +28,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,25 +47,28 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vincent.grainledger.BuildConfig
 import com.vincent.grainledger.data.model.BudgetItem
+import com.vincent.grainledger.data.updater.UpdateCheckState
+import com.vincent.grainledger.ui.theme.MiuixAnimation
 import com.vincent.grainledger.ui.screens.bookkeeping.BookkeepingDialog
 import com.vincent.grainledger.ui.screens.budget.BudgetScreen
 import com.vincent.grainledger.ui.screens.budget.EditBudgetItemDialog
 import com.vincent.grainledger.ui.screens.dashboard.DashboardScreen
 import com.vincent.grainledger.ui.screens.settings.SettingsScreen
 import com.vincent.grainledger.ui.screens.transactions.TransactionTreeScreen
+import com.vincent.grainledger.ui.screens.updater.UpdateCheckDialog
+import com.vincent.grainledger.ui.screens.updater.UpdateScreen
 import com.vincent.grainledger.ui.theme.GrainLedgerTheme
-import com.vincent.grainledger.ui.theme.MiuixAnimation
 import com.vincent.grainledger.ui.theme.MiuixBlue
 import com.vincent.grainledger.ui.theme.MiuixShapes
 import com.vincent.grainledger.ui.viewmodel.MainViewModel
-import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * 底部导航页签定义。
+ * 导航页签项数据模型。
  *
- * @property index 页签索引位置
+ * @property index 页签索引
  * @property title 页签标题
  * @property icon 页签图标
  */
@@ -76,7 +83,7 @@ sealed class NavigationTab(val index: Int, val title: String, val icon: ImageVec
  * 应用主容器界面 (MainContainerScreen)。
  *
  * 组织四大核心页面（看板、预算、流水、设置）的切换展示，
- * 容纳全局记账弹窗与预算编辑弹窗，并响应提示消息。
+ * 容纳全局记账弹窗与预算编辑弹窗、启动静默检查更新与独立检查更新页面。
  *
  * @param viewModel 全局视图模型
  */
@@ -92,11 +99,19 @@ fun MainContainerScreen(
     val currentYear by viewModel.currentYear.collectAsState()
     val currentMonth by viewModel.currentMonth.collectAsState()
     val allCategories by viewModel.allCategories.collectAsState()
+    val updateCheckState by viewModel.updateCheckState.collectAsState()
+    val downloadProgress by viewModel.downloadProgress.collectAsState()
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var showBookkeepingDialog by remember { mutableStateOf(false) }
     var editingBudgetItem by remember { mutableStateOf<BudgetItem?>(null) }
     var showBudgetEditDialog by remember { mutableStateOf(false) }
+    var showUpdateHistoryScreen by remember { mutableStateOf(false) }
+
+    // 冷启动时静默检查更新，仅在发现新版本时触发弹窗提示
+    LaunchedEffect(Unit) {
+        viewModel.checkUpdateOnStartup(BuildConfig.VERSION_NAME)
+    }
 
     // 提示信息监听
     val toastMessage by viewModel.toastMessage.collectAsState()
@@ -143,7 +158,8 @@ fun MainContainerScreen(
                             viewModel = viewModel
                         )
                         3 -> SettingsScreen(
-                            viewModel = viewModel
+                            viewModel = viewModel,
+                            onNavigateToUpdate = { showUpdateHistoryScreen = true }
                         )
                     }
                 }
@@ -209,6 +225,19 @@ fun MainContainerScreen(
                         }
                     }
                 }
+
+                // 独立检查更新与版本发布历史全屏页面
+                AnimatedVisibility(
+                    visible = showUpdateHistoryScreen,
+                    enter = slideInHorizontally(initialOffsetX = { it }, animationSpec = MiuixAnimation.springSmooth()) + fadeIn(),
+                    exit = slideOutHorizontally(targetOffsetX = { it }, animationSpec = MiuixAnimation.springSmooth()) + fadeOut(),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    UpdateScreen(
+                        viewModel = viewModel,
+                        onBack = { showUpdateHistoryScreen = false }
+                    )
+                }
             }
 
             // 全局快速记账弹窗
@@ -230,6 +259,26 @@ fun MainContainerScreen(
                     onSave = { viewModel.saveBudgetItem(it) },
                     onDelete = { viewModel.deleteBudgetItem(it) },
                     onDismissRequest = { showBudgetEditDialog = false }
+                )
+            }
+
+            // 启动时或检测到新版本的全局更新弹窗
+            if (updateCheckState is UpdateCheckState.HasUpdate) {
+                UpdateCheckDialog(
+                    checkState = updateCheckState,
+                    downloadProgress = downloadProgress,
+                    onStartDownload = { downloadUrl, fileName ->
+                        viewModel.startDownloadApk(context, downloadUrl, fileName)
+                    },
+                    onCancelDownload = {
+                        viewModel.cancelDownload()
+                    },
+                    onRetry = {
+                        viewModel.checkForUpdates(BuildConfig.VERSION_NAME)
+                    },
+                    onDismiss = {
+                        viewModel.resetUpdateState()
+                    }
                 )
             }
         }
