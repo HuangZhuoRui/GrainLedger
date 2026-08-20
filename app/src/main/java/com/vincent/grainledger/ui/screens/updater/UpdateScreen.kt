@@ -1,6 +1,5 @@
 package com.vincent.grainledger.ui.screens.updater
 
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,7 +19,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,7 +41,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.net.toUri
 import com.vincent.grainledger.BuildConfig
 import com.vincent.grainledger.data.updater.DownloadProgress
 import com.vincent.grainledger.data.updater.DownloadStatus
@@ -316,14 +313,6 @@ fun UpdateScreen(
                         },
                         onCancelDownload = {
                             viewModel.cancelDownload()
-                        },
-                        onOpenBrowser = { url ->
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                context.startActivity(intent)
-                            } catch (_: Exception) {}
                         }
                     )
                 }
@@ -364,8 +353,7 @@ private fun ReleaseHistoryCard(
     downloadProgress: DownloadProgress,
     onStartNormalDownload: (directUrl: String, fileName: String) -> Unit,
     onStartAcceleratedDownload: (acceleratedUrl: String, fileName: String) -> Unit,
-    onCancelDownload: () -> Unit,
-    onOpenBrowser: (url: String) -> Unit
+    onCancelDownload: () -> Unit
 ) {
     val changelog = release.parsedChangelog
     val apkAsset = release.androidAsset
@@ -456,34 +444,13 @@ private fun ReleaseHistoryCard(
                 )
             }
 
-            // 3. 安装包信息行
+            // 3. 安装包体积展示
             if (apkAsset != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "安装包体积: ${apkAsset.formattedSize}",
-                        fontSize = 12.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary
-                    )
-
-                    IconButton(
-                        onClick = {
-                            val url = release.androidDownloadUrl ?: "https://github.com/HuangZhuoRui/GrainLedger/releases"
-                            onOpenBrowser(url)
-                        },
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.OpenInBrowser,
-                            contentDescription = "浏览器打开",
-                            tint = MiuixTheme.colorScheme.onSurfaceSecondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
+                Text(
+                    text = "安装包体积: ${apkAsset.formattedSize}",
+                    fontSize = 12.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceSecondary
+                )
 
                 // 4. 下载进度或下载操作按钮
                 if (isDownloading) {
@@ -539,6 +506,7 @@ private fun ReleaseHistoryCard(
                             Button(
                                 onClick = onCancelDownload,
                                 modifier = Modifier.height(28.dp),
+                                insideMargin = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                                 colors = ButtonDefaults.buttonColors(color = MiuixRed.copy(alpha = 0.85f))
                             ) {
                                 Text(
@@ -551,7 +519,7 @@ private fun ReleaseHistoryCard(
                         }
                     }
                 } else {
-                    // 下载选项按钮行（加速下载与正常下载均分宽度，绝不挤压）
+                    // 下载选项按钮行（优化内边距，确保文字永不截断）
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -568,16 +536,16 @@ private fun ReleaseHistoryCard(
                                 }
                                 onStartAcceleratedDownload(acceleratedUrl, fileName)
                             },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(38.dp),
+                            modifier = Modifier.weight(1f),
+                            insideMargin = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
                             colors = ButtonDefaults.buttonColors(color = MiuixBlue)
                         ) {
                             Text(
                                 text = "加速下载",
                                 fontSize = 13.sp,
                                 color = Color.White,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
                             )
                         }
 
@@ -588,16 +556,16 @@ private fun ReleaseHistoryCard(
                                 val fileName = apkAsset.name
                                 onStartNormalDownload(directUrl, fileName)
                             },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(38.dp),
+                            modifier = Modifier.weight(1f),
+                            insideMargin = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
                             colors = ButtonDefaults.buttonColors(color = MiuixTheme.colorScheme.surfaceVariant)
                         ) {
                             Text(
                                 text = "正常下载",
                                 fontSize = 13.sp,
                                 color = MiuixTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1
                             )
                         }
                     }

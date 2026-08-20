@@ -1,6 +1,5 @@
 package com.vincent.grainledger.ui.screens.updater
 
-import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -15,6 +14,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,7 +32,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.net.toUri
 import com.vincent.grainledger.data.updater.DownloadProgress
 import com.vincent.grainledger.data.updater.DownloadStatus
 import com.vincent.grainledger.data.updater.GitHubRelease
@@ -144,14 +142,6 @@ fun UpdateCheckDialog(
                                     downloadProgress = downloadProgress,
                                     onStartDownload = onStartDownload,
                                     onCancelDownload = onCancelDownload,
-                                    onOpenInBrowser = { url ->
-                                        try {
-                                            val browserIntent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
-                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                            }
-                                            context.startActivity(browserIntent)
-                                        } catch (_: Exception) {}
-                                    },
                                     onDismiss = onDismiss
                                 )
                             }
@@ -222,7 +212,6 @@ private fun HasUpdateView(
     downloadProgress: DownloadProgress,
     onStartDownload: (downloadUrl: String, fileName: String) -> Unit,
     onCancelDownload: () -> Unit,
-    onOpenInBrowser: (url: String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val isDownloading = downloadProgress.status == DownloadStatus.DOWNLOADING
@@ -380,10 +369,17 @@ private fun HasUpdateView(
                             onStartDownload(targetDownloadUrl, fileName)
                         },
                         modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 10.dp),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MiuixBlue)
                     ) {
-                        Text(text = "加速下载", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "加速下载",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            maxLines = 1
+                        )
                     }
 
                     Button(
@@ -392,10 +388,17 @@ private fun HasUpdateView(
                             onStartDownload(directUrl, fileName)
                         },
                         modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 10.dp),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MiuixTheme.colorScheme.surfaceVariant)
                     ) {
-                        Text(text = "正常下载", color = MiuixTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                        Text(
+                            text = "正常下载",
+                            color = MiuixTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 13.sp,
+                            maxLines = 1
+                        )
                     }
                 }
 
@@ -406,34 +409,6 @@ private fun HasUpdateView(
                 ) {
                     Text(text = "稍后再说", color = MiuixTheme.colorScheme.onSurfaceSecondary)
                 }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // 浏览器备用下载
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        val directUrl = release.androidDownloadUrl ?: "https://github.com/HuangZhuoRui/GrainLedger/releases"
-                        onOpenInBrowser(directUrl)
-                    }
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.OpenInBrowser,
-                    contentDescription = "浏览器打开",
-                    tint = MiuixTheme.colorScheme.onSurfaceSecondary,
-                    modifier = Modifier.size(15.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "使用手机浏览器下载",
-                    fontSize = 12.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceSecondary
-                )
             }
         }
     }
