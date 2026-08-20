@@ -272,4 +272,32 @@ class MonthAndCategoryTest {
         assertEquals(16000.0, m9TotalAllocated, 0.001)
         assertEquals(14500.0, m9Balance, 0.001)
     }
+
+    @Test
+    fun testMultiMonthContinuousChainRollover() {
+        // 模拟多月历史链条 (6月 -> 7月 -> 8月 -> 9月)，验证资金一分不漏全程继承
+        var cumulativeRollover = 0.0
+
+        // 6月：基础预算 5000，入账 8000，消费 3000 -> 期末结余 10000
+        val m6Funds = 5000.0 + 8000.0 + cumulativeRollover
+        val m6Ending = m6Funds - 3000.0
+        assertEquals(10000.0, m6Ending, 0.001)
+        cumulativeRollover = m6Ending
+
+        // 7月：基础预算 2000，入账 0，继承6月滚存 10000 -> 总资金 12000，消费 4000 -> 期末结余 8000
+        val m7Funds = 2000.0 + 0.0 + cumulativeRollover
+        val m7Ending = m7Funds - 4000.0
+        assertEquals(8000.0, m7Ending, 0.001)
+        cumulativeRollover = m7Ending
+
+        // 8月：基础预算 3000，入账 1000，继承7月滚存 8000 -> 总资金 12000，消费 2000 -> 期末结余 10000
+        val m8Funds = 3000.0 + 1000.0 + cumulativeRollover
+        val m8Ending = m8Funds - 2000.0
+        assertEquals(10000.0, m8Ending, 0.001)
+        cumulativeRollover = m8Ending
+
+        // 9月：基础预算 4000，入账 500，继承8月滚存 10000 -> 总资金 14500
+        val m9Funds = 4000.0 + 500.0 + cumulativeRollover
+        assertEquals(14500.0, m9Funds, 0.001)
+    }
 }

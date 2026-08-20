@@ -334,23 +334,36 @@ class LedgerRepository(context: Context) {
         // 3. 支出来自消费总额
         val totalSpent = BigDecimal(expenseBudgetItems.sumOf { it.actualSpent }).setScale(2, RoundingMode.HALF_UP).toDouble()
 
-        // 4. 上月结余滚存计算（自动结转上月未用完的资金给下月使用）
-        val (prevYear, prevMonth) = if (month == 1) Pair(year - 1, 12) else Pair(year, month - 1)
-        val prevBudgetItems = getBudgetItemsByMonth(prevYear, prevMonth)
-        val prevTransactions = getTransactionsByMonth(prevYear, prevMonth)
+        // 4. 历史各月链式累加结余滚存（无论跨越多少个月，所有历史剩余未用完的资金全程持续继承）
+        val allChronologicalMonths = (budgetItemDao.getAvailableMonths() + transactionDao.getAvailableMonths())
+            .distinct()
+            .sortedWith(Comparator { a, b ->
+                if (a.first != b.first) a.first.compareTo(b.first) else a.second.compareTo(b.second)
+            })
 
-        val rolloverFromPreviousMonth: Double = if (prevBudgetItems.isNotEmpty() || prevTransactions.isNotEmpty()) {
-            val prevExpenseItems = prevBudgetItems.filter { categoryMap[it.categoryName]?.isIncome != true }
-            val prevExpenseAllocated = prevExpenseItems.sumOf { it.actualAllocated }
-            val prevIncomeTotal = prevTransactions.filter { it.amount > 0 }.sumOf { it.amount }
-            val prevSpentTotal = prevExpenseItems.sumOf { it.actualSpent }
-            val prevBalance = BigDecimal((prevExpenseAllocated + prevIncomeTotal) - prevSpentTotal).setScale(2, RoundingMode.HALF_UP).toDouble()
-            if (prevBalance > 0.0) prevBalance else 0.0
-        } else {
-            0.0
+        val priorMonths = allChronologicalMonths.filter {
+            it.first < year || (it.first == year && it.second < month)
         }
 
-        // 当月总资金池总量 = 支出预算基础分配 + 真实入账总额 + 上月结余滚存
+        var cumulativeRollover = 0.0
+        for ((pYear, pMonth) in priorMonths) {
+            val pBudgetItems = budgetItemDao.getBudgetItemsByMonth(pYear, pMonth)
+            val pExpenseItems = pBudgetItems.filter { categoryMap[it.categoryName]?.isIncome != true }
+            val pExpenseAllocated = pExpenseItems.sumOf { it.actualAllocated }
+            val pTransactions = transactionDao.getTransactionsByMonth(pYear, pMonth)
+            val pIncomeTotal = pTransactions.filter { it.amount > 0 }.sumOf { it.amount }
+            val pSpentTotal = pExpenseItems.sumOf { it.actualSpent }
+
+            // 该历史月总资金 = 基础分配 + 真实入账 + 来自更早历史月份的累积滚存
+            val pTotalFunds = pExpenseAllocated + pIncomeTotal + cumulativeRollover
+            // 该历史月期末结余，持续流转继承给下一个历史月份
+            val pEndingBalance = pTotalFunds - pSpentTotal
+            cumulativeRollover = if (pEndingBalance > 0.0) pEndingBalance else 0.0
+        }
+
+        val rolloverFromPreviousMonth = BigDecimal(cumulativeRollover).setScale(2, RoundingMode.HALF_UP).toDouble()
+
+        // 当月总资金池总量 = 支出预算基础分配 + 真实入账总额 + 历史全程累计滚存资金
         val totalActualAllocated = BigDecimal(totalExpenseAllocated + totalIncome + rolloverFromPreviousMonth).setScale(2, RoundingMode.HALF_UP).toDouble()
         // 当月可用总结余 = 总资金池总量 - 总消费支出
         val totalBalance = BigDecimal(totalActualAllocated - totalSpent).setScale(2, RoundingMode.HALF_UP).toDouble()
