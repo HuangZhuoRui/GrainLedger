@@ -41,7 +41,6 @@ fun MiuixSectionCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
             .then(
                 if (onClick != null) {
                     Modifier.clickable(
