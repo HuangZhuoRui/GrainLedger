@@ -113,10 +113,17 @@ fun ReleaseHistoryCard(
                         items = changelog.fixes
                     )
                 }
-                if (changelog.others.isNotEmpty()) {
+                if (changelog.improvements.isNotEmpty()) {
                     ChangelogSection(
                         title = "优化改进",
                         accentColor = MiuixPurple,
+                        items = changelog.improvements
+                    )
+                }
+                if (changelog.others.isNotEmpty()) {
+                    ChangelogSection(
+                        title = "其他变更",
+                        accentColor = MiuixTheme.colorScheme.onSurfaceSecondary,
                         items = changelog.others
                     )
                 }

@@ -57,8 +57,10 @@ import com.vincent.grainledger.data.updater.DownloadStatus
 import com.vincent.grainledger.data.updater.GitHubRelease
 import com.vincent.grainledger.data.updater.UpdateCheckState
 import com.vincent.grainledger.ui.components.feedback.DownloadProgressPanel
+import com.vincent.grainledger.ui.screens.updater.components.ChangelogSection
 import com.vincent.grainledger.ui.theme.MiuixBlue
 import com.vincent.grainledger.ui.theme.MiuixGreen
+import com.vincent.grainledger.ui.theme.MiuixPurple
 import com.vincent.grainledger.ui.theme.MiuixRed
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -297,21 +299,58 @@ private fun HasUpdateView(
         )
         Spacer(modifier = Modifier.height(6.dp))
 
+        val changelog = release.parsedChangelog
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 160.dp)
+                .heightIn(max = 180.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                .padding(12.dp)
+                .padding(10.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Text(
-                text = if (release.body.isNotBlank()) release.body else "本次更新包含多项稳定性改进与体验优化。",
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-                color = MiuixTheme.colorScheme.onSurface
-            )
+            if (changelog.hasCategorized) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (changelog.features.isNotEmpty()) {
+                        ChangelogSection(
+                            title = "新增特性",
+                            accentColor = MiuixBlue,
+                            items = changelog.features
+                        )
+                    }
+                    if (changelog.fixes.isNotEmpty()) {
+                        ChangelogSection(
+                            title = "问题修复",
+                            accentColor = MiuixGreen,
+                            items = changelog.fixes
+                        )
+                    }
+                    if (changelog.improvements.isNotEmpty()) {
+                        ChangelogSection(
+                            title = "优化改进",
+                            accentColor = MiuixPurple,
+                            items = changelog.improvements
+                        )
+                    }
+                    if (changelog.others.isNotEmpty()) {
+                        ChangelogSection(
+                            title = "其他变更",
+                            accentColor = MiuixTheme.colorScheme.onSurfaceSecondary,
+                            items = changelog.others
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = if (release.body.isNotBlank()) release.body else "本次更新包含多项稳定性改进与体验优化。",
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    color = MiuixTheme.colorScheme.onSurface
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))

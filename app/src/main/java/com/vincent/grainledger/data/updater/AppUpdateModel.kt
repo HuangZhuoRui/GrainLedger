@@ -1,26 +1,42 @@
 package com.vincent.grainledger.data.updater
 
 import java.util.Locale
+import java.util.regex.Pattern
 
 /**
  * 结构化更新日志解析模型。
  *
- * @property features 新增特性列表 (feat:)
- * @property fixes 修复问题列表 (fix:)
+ * 智能识别 Conventional Commits 规范，自动归类展示：
+ * - features: 新增特性 (feat:, feature:)
+ * - fixes: 问题修复 (fix:, bugfix:, hotfix:)
+ * - improvements: 优化重构与体验提升 (perf:, refactor:, style:)
+ * - others: 文档与维护项 (docs:, chore:, test:, revert:)
+ *
+ * @property features 新增特性列表
+ * @property fixes 修复问题列表
+ * @property improvements 优化与重构列表
  * @property others 其他变更内容
  */
 data class ParsedChangelog(
     val features: List<String> = emptyList(),
     val fixes: List<String> = emptyList(),
+    val improvements: List<String> = emptyList(),
     val others: List<String> = emptyList()
 ) {
     val hasCategorized: Boolean
-        get() = features.isNotEmpty() || fixes.isNotEmpty()
+        get() = features.isNotEmpty() || fixes.isNotEmpty() || improvements.isNotEmpty() || others.isNotEmpty()
 
     companion object {
+        // 正则表达式匹配: ^(?<type>feat|fix|perf|...)(?:[(](?<scope>[^)]+)[)])?[:：\s]\s*(?<desc>.+)$
+        private val COMMIT_PATTERN = Pattern.compile(
+            """^(?:[-*]\s*)?(feat|feature|fix|bugfix|hotfix|perf|refactor|style|docs|chore|test|revert)(?:\(([^)]+)\))?[:：\s]\s*(.+)$""",
+            Pattern.CASE_INSENSITIVE
+        )
+
         fun parse(rawBody: String): ParsedChangelog {
             val features = mutableListOf<String>()
             val fixes = mutableListOf<String>()
+            val improvements = mutableListOf<String>()
             val others = mutableListOf<String>()
 
             val lines = rawBody.split('\n')
@@ -28,43 +44,58 @@ data class ParsedChangelog(
                 val line = rawLine.trim()
                 if (line.isEmpty() || line.startsWith("#")) continue
 
-                var content = line
-                if (content.startsWith("- ") || content.startsWith("* ")) {
-                    content = content.substring(2).trim()
+                // 剔除 markdown 列表前导符
+                var cleanLine = line
+                if (cleanLine.startsWith("- ") || cleanLine.startsWith("* ")) {
+                    cleanLine = cleanLine.substring(2).trim()
                 }
+                if (cleanLine.isEmpty()) continue
 
-                val lower = content.lowercase(Locale.getDefault())
+                val lower = cleanLine.lowercase(Locale.getDefault())
                 if (lower.startsWith("tmp:") || lower.startsWith("tmp：") || lower.startsWith("tmp ") ||
                     lower.startsWith("temp:") || lower.startsWith("temp：") || lower.startsWith("temp ")) {
                     continue
                 }
 
-                when {
-                    lower.startsWith("feat:") || lower.startsWith("feat：") -> {
-                        features.add(content.substring(5).trim())
+                val matcher = COMMIT_PATTERN.matcher(cleanLine)
+                if (matcher.matches()) {
+                    val type = matcher.group(1)?.lowercase(Locale.getDefault()) ?: ""
+                    val scope = matcher.group(2)?.trim()
+                    val description = matcher.group(3)?.trim() ?: ""
+
+                    // 格式化输出: 如果有 scope 模块名，则自动加上 [模块] 前缀
+                    val formattedItem = if (!scope.isNullOrBlank()) {
+                        val scopeUpper = scope.uppercase(Locale.getDefault())
+                        "[$scopeUpper] $description"
+                    } else {
+                        description
                     }
-                    lower.startsWith("feat ") -> {
-                        features.add(content.substring(5).trim())
+
+                    when (type) {
+                        "feat", "feature" -> features.add(formattedItem)
+                        "fix", "bugfix", "hotfix" -> fixes.add(formattedItem)
+                        "perf", "refactor", "style" -> improvements.add(formattedItem)
+                        "docs", "chore", "test", "revert" -> others.add(formattedItem)
+                        else -> others.add(formattedItem)
                     }
-                    lower.startsWith("feature:") || lower.startsWith("feature ") -> {
-                        features.add(content.substring(lower.indexOf("feature") + 7).trim())
+                } else {
+                    // 普通 markdown 列表行，剔除前导标识符
+                    var cleanLine = line
+                    if (cleanLine.startsWith("- ") || cleanLine.startsWith("* ")) {
+                        cleanLine = cleanLine.substring(2).trim()
                     }
-                    lower.startsWith("fix:") || lower.startsWith("fix：") -> {
-                        fixes.add(content.substring(4).trim())
-                    }
-                    lower.startsWith("fix ") -> {
-                        fixes.add(content.substring(4).trim())
-                    }
-                    lower.startsWith("bugfix:") || lower.startsWith("bugfix ") -> {
-                        fixes.add(content.substring(lower.indexOf("bugfix") + 6).trim())
-                    }
-                    content.isNotEmpty() -> {
-                        others.add(content)
+                    if (cleanLine.isNotEmpty()) {
+                        others.add(cleanLine)
                     }
                 }
             }
 
-            return ParsedChangelog(features, fixes, others)
+            return ParsedChangelog(
+                features = features,
+                fixes = fixes,
+                improvements = improvements,
+                others = others
+            )
         }
     }
 }

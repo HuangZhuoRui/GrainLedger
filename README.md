@@ -12,7 +12,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey.svg)](LICENSE)
 [![GitHub Release](https://img.shields.io/github/v/release/HuangZhuoRui/GrainLedger?include_prereleases&color=blue)](https://github.com/HuangZhuoRui/GrainLedger/releases)
 
-[功能特性](#-功能特性) • [架构设计](#-架构设计) • [界面预览](#-界面设计与体验) • [快速开始](#-快速开始与构建) • [更新与下载](#-下载与更新)
+[功能特性](#-功能特性) • [架构设计](#-架构设计) • [界面预览](#-界面设计与体验) • [快速开始](#-快速开始与构建) • [更新与下载](#-下载与更新) • [提交规范](COMMIT_CONVENTION.md)
 
 </div>
 
