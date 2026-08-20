@@ -158,6 +158,7 @@ fun MainContainerScreen(
             when (pageIndex) {
                 0 -> DashboardScreen(
                     viewModel = viewModel,
+                    isActive = (pagerState.targetPage == 0),
                     onOpenBookkeeping = { showBookkeepingDialog = true },
                     onBudgetItemClick = { item ->
                         editingBudgetItem = item
@@ -165,10 +166,12 @@ fun MainContainerScreen(
                     }
                 )
                 1 -> BudgetScreen(
-                    viewModel = viewModel
+                    viewModel = viewModel,
+                    isActive = (pagerState.targetPage == 1)
                 )
                 2 -> TransactionTreeScreen(
-                    viewModel = viewModel
+                    viewModel = viewModel,
+                    isActive = (pagerState.targetPage == 2)
                 )
                 3 -> SettingsScreen(
                     viewModel = viewModel,

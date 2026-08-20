@@ -66,6 +66,7 @@ import kotlin.math.absoluteValue
  * @param currentMonth 当前月份
  * @param pageTitle 页面主标题（如 "余粮"、"预算规划"、"账单流水"）
  * @param subtitle 页面副标题说明
+ * @param isActive 当前页面是否处于 TabBar 前台活跃显示状态
  * @param headerActionSlot 顶部标题栏右侧自定义操作插槽
  * @param onMonthSelected 切换月份回调
  * @param onAddMonthClick 新增月份点击回调
@@ -80,6 +81,7 @@ fun MonthPagerScaffold(
     currentMonth: Int,
     pageTitle: String,
     subtitle: String? = null,
+    isActive: Boolean = true,
     headerActionSlot: @Composable (() -> Unit)? = null,
     onMonthSelected: (Int, Int) -> Unit,
     onAddMonthClick: (() -> Unit)? = null,
@@ -111,22 +113,31 @@ fun MonthPagerScaffold(
     // 记录 Pager 自身最后结算的页面，用于防止快速手势时被 ViewModel 回流状态误反向拉回
     var lastSettledPage by remember { mutableIntStateOf(pagerState.currentPage) }
 
-    // 仅当外部（如点击弹窗新建月份、外部切换等）修改了月份且与当前 Pager 结算页不一致时才驱动滚动
-    LaunchedEffect(currentMonthIndex) {
-        if (currentMonthIndex != lastSettledPage && currentMonthIndex in safeMonths.indices) {
-            lastSettledPage = currentMonthIndex
-            if (pagerState.currentPage != currentMonthIndex) {
-                pagerState.animateScrollToPage(
-                    page = currentMonthIndex,
-                    animationSpec = MiuixAnimation.springSmooth()
-                )
+    // 当页面处于后台非激活状态，或者刚切换为激活状态时，直接瞬时对齐目标月份，禁止在后台运行悬挂动画
+    LaunchedEffect(currentMonthIndex, isActive) {
+        if (!isActive) {
+            // 后台页面：立即无动效瞬时对齐，杜绝后台动画未结算产生的残余位移与晃动
+            if (currentMonthIndex in safeMonths.indices && pagerState.currentPage != currentMonthIndex) {
+                lastSettledPage = currentMonthIndex
+                pagerState.scrollToPage(currentMonthIndex)
+            }
+        } else {
+            // 当前活跃页面：如果之前处于非对齐状态，瞬时复位；若是用户在当前前台点击触发切月，才执行平滑滚动
+            if (currentMonthIndex != lastSettledPage && currentMonthIndex in safeMonths.indices) {
+                lastSettledPage = currentMonthIndex
+                if (pagerState.currentPage != currentMonthIndex) {
+                    pagerState.animateScrollToPage(
+                        page = currentMonthIndex,
+                        animationSpec = MiuixAnimation.springSmooth()
+                    )
+                }
             }
         }
     }
 
-    // 监听用户手势滑动 Pager 结算完成，同步通知外部更新单一数据源
-    LaunchedEffect(pagerState.settledPage) {
-        if (pagerState.settledPage in safeMonths.indices) {
+    // 仅在前台激活状态下，用户滑动 Pager 结算后才向外通知单一数据源更新
+    LaunchedEffect(pagerState.settledPage, isActive) {
+        if (isActive && pagerState.settledPage in safeMonths.indices) {
             lastSettledPage = pagerState.settledPage
             val (sYear, sMonth) = safeMonths[pagerState.settledPage]
             if (sYear != currentYear || sMonth != currentMonth) {

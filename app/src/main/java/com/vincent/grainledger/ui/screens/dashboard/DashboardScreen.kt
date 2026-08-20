@@ -54,6 +54,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun DashboardScreen(
     viewModel: MainViewModel,
+    isActive: Boolean = true,
     onOpenBookkeeping: () -> Unit,
     onBudgetItemClick: (BudgetItem) -> Unit,
     modifier: Modifier = Modifier
@@ -74,6 +75,7 @@ fun DashboardScreen(
         currentMonth = currentMonth,
         pageTitle = "余粮",
         subtitle = "个人预算信封与智能日常记账系统",
+        isActive = isActive,
         onMonthSelected = { year, month ->
             viewModel.selectMonth(year, month)
         },

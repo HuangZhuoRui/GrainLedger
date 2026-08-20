@@ -49,6 +49,7 @@ import com.vincent.grainledger.ui.viewmodel.MainViewModel
 @Composable
 fun BudgetScreen(
     viewModel: MainViewModel,
+    isActive: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val currentYear by viewModel.currentYear.collectAsState()
@@ -79,6 +80,7 @@ fun BudgetScreen(
         currentMonth = currentMonth,
         pageTitle = "预算规划",
         subtitle = "规划每月支出预算细项与资金注入额度",
+        isActive = isActive,
         headerActionSlot = {
             TextButton(
                 onClick = { showCategoryManagementDialog = true }

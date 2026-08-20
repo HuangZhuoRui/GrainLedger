@@ -53,6 +53,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun TransactionTreeScreen(
     viewModel: MainViewModel,
+    isActive: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val currentYear by viewModel.currentYear.collectAsState()
@@ -101,6 +102,7 @@ fun TransactionTreeScreen(
         currentMonth = currentMonth,
         pageTitle = "账单流水",
         subtitle = "查看每日支出与入账明细及双剩余实时变化",
+        isActive = isActive,
         onMonthSelected = { year, month ->
             viewModel.selectMonth(year, month)
         },
