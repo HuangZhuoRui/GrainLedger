@@ -3,8 +3,8 @@ package com.vincent.grainledger.ui.screens
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -140,12 +140,31 @@ fun MainContainerScreen(
                 .background(MiuixTheme.colorScheme.background)
                 .statusBarsPadding()
         ) {
-            // 页面切换容器
+            // 页面切换容器（纯左右平移无渐变）
             AnimatedContent(
                 targetState = selectedTabIndex,
                 transitionSpec = {
-                    fadeIn(animationSpec = MiuixAnimation.springFast())
-                        .togetherWith(fadeOut(animationSpec = MiuixAnimation.springFast()))
+                    if (targetState > initialState) {
+                        slideInHorizontally(
+                            initialOffsetX = { fullWidth -> fullWidth },
+                            animationSpec = MiuixAnimation.springSmooth()
+                        ).togetherWith(
+                            slideOutHorizontally(
+                                targetOffsetX = { fullWidth -> -fullWidth },
+                                animationSpec = MiuixAnimation.springSmooth()
+                            )
+                        )
+                    } else {
+                        slideInHorizontally(
+                            initialOffsetX = { fullWidth -> -fullWidth },
+                            animationSpec = MiuixAnimation.springSmooth()
+                        ).togetherWith(
+                            slideOutHorizontally(
+                                targetOffsetX = { fullWidth -> fullWidth },
+                                animationSpec = MiuixAnimation.springSmooth()
+                            )
+                        )
+                    }
                 },
                 label = "主页签切换",
                 modifier = Modifier.fillMaxSize()

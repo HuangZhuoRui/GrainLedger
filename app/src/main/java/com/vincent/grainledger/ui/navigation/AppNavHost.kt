@@ -1,7 +1,5 @@
 package com.vincent.grainledger.ui.navigation
 
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -20,7 +18,7 @@ import com.vincent.grainledger.ui.viewmodel.MainViewModel
 /**
  * 应用全局根导航图 (AppNavHost)。
  *
- * 基于 Android Jetpack Navigation Compose 规范构建完整的返回栈管理与平滑转场动效。
+ * 基于 Android Jetpack Navigation Compose 规范构建完整的返回栈管理与纯左右滑动的转场动效（无渐变）。
  *
  * @param viewModel 全局视图模型
  */
@@ -41,25 +39,25 @@ fun AppNavHost(
                 slideInHorizontally(
                     initialOffsetX = { fullWidth -> fullWidth },
                     animationSpec = MiuixAnimation.springSmooth()
-                ) + fadeIn()
+                )
             },
             exitTransition = {
                 slideOutHorizontally(
-                    targetOffsetX = { fullWidth -> -fullWidth / 4 },
+                    targetOffsetX = { fullWidth -> -fullWidth },
                     animationSpec = MiuixAnimation.springSmooth()
-                ) + fadeOut()
+                )
             },
             popEnterTransition = {
                 slideInHorizontally(
-                    initialOffsetX = { fullWidth -> -fullWidth / 4 },
+                    initialOffsetX = { fullWidth -> -fullWidth },
                     animationSpec = MiuixAnimation.springSmooth()
-                ) + fadeIn()
+                )
             },
             popExitTransition = {
                 slideOutHorizontally(
                     targetOffsetX = { fullWidth -> fullWidth },
                     animationSpec = MiuixAnimation.springSmooth()
-                ) + fadeOut()
+                )
             }
         ) {
             // 主界面（底部导航：看板、预算、流水、设置）
