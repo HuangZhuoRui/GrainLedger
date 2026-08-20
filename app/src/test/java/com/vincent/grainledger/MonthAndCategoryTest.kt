@@ -91,5 +91,14 @@ class MonthAndCategoryTest {
         assertEquals("投资理财", category.categoryName)
         assertEquals(0xFF34C759L, category.themeColorValue)
         assertTrue(category.sortOrder > 0)
+
+        // 验证 Compose Color 正常转换，无 ColorSpace 21 异常
+        val color = category.themeColor
+        assertEquals(1f, color.alpha, 0.01f)
+
+        BudgetCategory.defaultCategories.forEach { defaultCat ->
+            val c = defaultCat.themeColor
+            assertEquals(1f, c.alpha, 0.01f)
+        }
     }
 }

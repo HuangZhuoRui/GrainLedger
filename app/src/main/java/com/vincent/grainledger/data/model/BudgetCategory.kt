@@ -25,7 +25,7 @@ data class BudgetCategory(
      * 获取 Compose Color 类型的分类主题色。
      */
     val themeColor: Color
-        get() = Color(themeColorValue)
+        get() = Color((themeColorValue and 0xFFFFFFFFL).toInt())
 
     companion object {
         /**

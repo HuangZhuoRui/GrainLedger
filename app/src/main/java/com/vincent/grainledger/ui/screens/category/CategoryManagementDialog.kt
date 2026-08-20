@@ -117,7 +117,7 @@ fun CategoryManagementDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(categoryList, key = { it.categoryId }) { cat ->
-                        val themeColor = Color(cat.themeColorValue.toULong())
+                        val themeColor = cat.themeColor
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

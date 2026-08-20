@@ -118,7 +118,7 @@ fun EditCategoryDialog(
                     ) {
                         PRESET_CATEGORY_COLORS.forEach { colorVal ->
                             val isSelected = (colorVal == selectedColorValue)
-                            val composeColor = Color(colorVal.toULong())
+                            val composeColor = Color((colorVal and 0xFFFFFFFFL).toInt())
 
                             Box(
                                 modifier = Modifier
