@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -47,11 +48,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.vincent.grainledger.R
 import com.vincent.grainledger.data.updater.DownloadProgress
 import com.vincent.grainledger.data.updater.DownloadStatus
 import com.vincent.grainledger.data.updater.GitHubRelease
@@ -62,6 +65,7 @@ import com.vincent.grainledger.ui.theme.MiuixBlue
 import com.vincent.grainledger.ui.theme.MiuixGreen
 import com.vincent.grainledger.ui.theme.MiuixPurple
 import com.vincent.grainledger.ui.theme.MiuixRed
+import com.vincent.grainledger.ui.theme.MiuixShapes
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Locale
@@ -233,20 +237,13 @@ private fun HasUpdateView(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
+            Image(
+                painter = painterResource(id = R.mipmap.ic_launcher),
+                contentDescription = "余粮 Logo",
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(MiuixBlue.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.CloudDownload,
-                    contentDescription = "更新",
-                    tint = MiuixBlue,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+                    .size(48.dp)
+                    .clip(MiuixShapes.MediumSquircle)
+            )
             Spacer(modifier = Modifier.width(14.dp))
             Column {
                 Text(
@@ -435,20 +432,14 @@ private fun AlreadyLatestView(
             .padding(vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
+        // 软件官方精致 Logo
+        Image(
+            painter = painterResource(id = R.mipmap.ic_launcher),
+            contentDescription = "余粮 Logo",
             modifier = Modifier
-                .size(54.dp)
-                .clip(CircleShape)
-                .background(MiuixGreen.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = "最新版本",
-                tint = MiuixGreen,
-                modifier = Modifier.size(32.dp)
-            )
-        }
+                .size(60.dp)
+                .clip(MiuixShapes.MediumSquircle)
+        )
         Spacer(modifier = Modifier.height(14.dp))
         Text(
             text = "当前已是最新版本",

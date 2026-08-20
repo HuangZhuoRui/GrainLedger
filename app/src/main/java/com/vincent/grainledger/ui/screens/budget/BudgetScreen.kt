@@ -184,7 +184,7 @@ fun BudgetScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 160.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // 1. 统计汇总头部卡片

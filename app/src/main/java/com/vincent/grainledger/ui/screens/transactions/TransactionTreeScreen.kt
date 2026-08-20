@@ -1,14 +1,21 @@
 package com.vincent.grainledger.ui.screens.transactions
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
@@ -33,6 +40,7 @@ import com.vincent.grainledger.ui.components.layout.MonthPagerScaffold
 import com.vincent.grainledger.ui.screens.budget.CreateMonthDialog
 import com.vincent.grainledger.ui.screens.transactions.components.TransactionDailyCard
 import com.vincent.grainledger.ui.screens.transactions.components.TransactionMonthSummaryCard
+import com.vincent.grainledger.ui.theme.MiuixAnimation
 import com.vincent.grainledger.ui.theme.MiuixGreen
 import com.vincent.grainledger.ui.theme.MiuixRed
 import com.vincent.grainledger.ui.theme.MiuixShapes
@@ -151,7 +159,7 @@ fun TransactionTreeScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 160.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // 1. 当月收支流水统计卡片
@@ -166,68 +174,117 @@ fun TransactionTreeScreen(
                 )
             }
 
-            // 2. 收支分类切换过滤器
+            // 2. 收支分类切换过滤器（平滑滑动胶囊指示器，物理移动轨迹与零水波纹闪烁）
             item {
-                Row(
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .height(44.dp)
                         .clip(MiuixShapes.MediumSquircle)
                         .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        .padding(4.dp)
                 ) {
-                    // 全部
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(MiuixShapes.SmallSquircle)
-                            .background(if (filterType == 0) MiuixTheme.colorScheme.surface else Color.Transparent)
-                            .clickable { filterType = 0 }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "全部 (${monthTransactions.size})",
-                            fontSize = 13.sp,
-                            fontWeight = if (filterType == 0) FontWeight.Bold else FontWeight.Normal,
-                            color = if (filterType == 0) MiuixTheme.colorScheme.onSurface else MiuixTheme.colorScheme.onSurfaceSecondary
-                        )
+                    val containerWidth = maxWidth
+                    val segmentCount = 3
+                    val tabWidth = containerWidth / segmentCount
+
+                    // 动画计算滑动胶囊的 X 轴偏移量（Spring 物理弹簧阻尼）
+                    val animatedOffsetX by animateDpAsState(
+                        targetValue = tabWidth * filterType,
+                        animationSpec = MiuixAnimation.springSmooth(),
+                        label = "filterIndicatorOffset"
+                    )
+
+                    // 动画计算滑动胶囊背景颜色
+                    val activeCapsuleColor = when (filterType) {
+                        1 -> MiuixRed.copy(alpha = 0.16f)
+                        2 -> MiuixGreen.copy(alpha = 0.16f)
+                        else -> MiuixTheme.colorScheme.surface
                     }
 
-                    // 仅支出
+                    // 1. 底层平滑左右滑动的物理胶囊指示器
                     Box(
                         modifier = Modifier
-                            .weight(1f)
+                            .offset(x = animatedOffsetX)
+                            .width(tabWidth)
+                            .fillMaxHeight()
                             .clip(MiuixShapes.SmallSquircle)
-                            .background(if (filterType == 1) MiuixRed.copy(alpha = 0.15f) else Color.Transparent)
-                            .clickable { filterType = 1 }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "支出 (${expenseRecords.size})",
-                            fontSize = 13.sp,
-                            fontWeight = if (filterType == 1) FontWeight.Bold else FontWeight.Normal,
-                            color = if (filterType == 1) MiuixRed else MiuixTheme.colorScheme.onSurfaceSecondary
-                        )
-                    }
+                            .background(activeCapsuleColor)
+                    )
 
-                    // 仅收入
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(MiuixShapes.SmallSquircle)
-                            .background(if (filterType == 2) MiuixGreen.copy(alpha = 0.15f) else Color.Transparent)
-                            .clickable { filterType = 2 }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
+                    // 2. 顶层无水波纹点击触发层与文本
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "收入 (${incomeRecords.size})",
-                            fontSize = 13.sp,
-                            fontWeight = if (filterType == 2) FontWeight.Bold else FontWeight.Normal,
-                            color = if (filterType == 2) MiuixGreen else MiuixTheme.colorScheme.onSurfaceSecondary
-                        )
+                        // 全部 (0)
+                        val isAllSelected = filterType == 0
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(MiuixShapes.SmallSquircle)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) {
+                                    filterType = 0
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "全部 (${monthTransactions.size})",
+                                fontSize = 13.sp,
+                                fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isAllSelected) MiuixTheme.colorScheme.onSurface else MiuixTheme.colorScheme.onSurfaceSecondary
+                            )
+                        }
+
+                        // 仅支出 (1)
+                        val isExpenseSelected = filterType == 1
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(MiuixShapes.SmallSquircle)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) {
+                                    filterType = 1
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "支出 (${expenseRecords.size})",
+                                fontSize = 13.sp,
+                                fontWeight = if (isExpenseSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isExpenseSelected) MiuixRed else MiuixTheme.colorScheme.onSurfaceSecondary
+                            )
+                        }
+
+                        // 仅收入 (2)
+                        val isIncomeSelected = filterType == 2
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(MiuixShapes.SmallSquircle)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) {
+                                    filterType = 2
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "收入 (${incomeRecords.size})",
+                                fontSize = 13.sp,
+                                fontWeight = if (isIncomeSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isIncomeSelected) MiuixGreen else MiuixTheme.colorScheme.onSurfaceSecondary
+                            )
+                        }
                     }
                 }
             }
