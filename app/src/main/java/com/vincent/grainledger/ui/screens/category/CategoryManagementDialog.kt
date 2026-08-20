@@ -41,6 +41,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.vincent.grainledger.data.model.BudgetCategory
 import com.vincent.grainledger.ui.components.dialog.ConfirmDialog
 import com.vincent.grainledger.ui.theme.MiuixBlue
+import com.vincent.grainledger.ui.theme.MiuixGreen
 import com.vincent.grainledger.ui.theme.MiuixRed
 import com.vincent.grainledger.ui.theme.MiuixShapes
 import top.yukonga.miuix.kmp.basic.Button
@@ -129,7 +130,7 @@ fun CategoryManagementDialog(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
@@ -143,6 +144,21 @@ fun CategoryManagementDialog(
                                     fontWeight = FontWeight.SemiBold,
                                     color = MiuixTheme.colorScheme.onSurface
                                 )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(
+                                            if (cat.isIncome) MiuixGreen.copy(alpha = 0.15f) else MiuixTheme.colorScheme.surfaceVariant
+                                        )
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = if (cat.isIncome) "+ 收入类" else "- 支出类",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (cat.isIncome) MiuixGreen else MiuixTheme.colorScheme.onSurfaceSecondary
+                                    )
+                                }
                             }
 
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {

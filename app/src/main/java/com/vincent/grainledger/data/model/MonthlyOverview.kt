@@ -5,14 +5,15 @@ package com.vincent.grainledger.data.model
  *
  * 对应 Excel 表格中的《综合查看》及看板核心指标：
  * 包含当月总规划预算（总价￥）、总实际加入资金（实际加入￥）、总实际消费、总结余、
- * 以及各大类的汇总对比数据。
+ * 收入类总额，以及各大类的汇总对比数据。
  *
  * @property year 目标年份
  * @property month 目标月份 (1-12)
  * @property totalPlannedBudget 该月所有预算项总价之和（例如 10054.60）
- * @property totalActualAllocated 该月所有注入资金之和（例如 10000.00）
+ * @property totalActualAllocated 该月总资金量（基础预算注入 + 收入类金额）
  * @property totalActualSpent 该月所有支出流水之和（例如 6013.50）
  * @property totalBalance 资金池总剩余（totalActualAllocated - totalActualSpent）
+ * @property totalIncome 当月收入类分类金额总和
  * @property categoryOverviewList 各大类的聚合统计列表
  */
 data class MonthlyOverview(
@@ -22,6 +23,7 @@ data class MonthlyOverview(
     val totalActualAllocated: Double = 0.0,
     val totalActualSpent: Double = 0.0,
     val totalBalance: Double = totalActualAllocated - totalActualSpent,
+    val totalIncome: Double = 0.0,
     val categoryOverviewList: List<CategoryOverview> = emptyList()
 )
 
@@ -33,6 +35,7 @@ data class MonthlyOverview(
  * @property categoryActualAllocated 该分类实际注入资金
  * @property categoryActualSpent 该分类实际已消费金额
  * @property categoryBalance 该分类剩余金额
+ * @property isIncome 是否为收入类
  * @property budgetItemList 该分类包含的具体预算细项列表
  */
 data class CategoryOverview(
@@ -41,6 +44,7 @@ data class CategoryOverview(
     val categoryActualAllocated: Double = 0.0,
     val categoryActualSpent: Double = 0.0,
     val categoryBalance: Double = categoryActualAllocated - categoryActualSpent,
+    val isIncome: Boolean = false,
     val budgetItemList: List<BudgetItem> = emptyList()
 ) {
     /**

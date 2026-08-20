@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -118,15 +119,40 @@ fun BudgetEnvelopeCard(
                         )
                     }
 
+                    val isIncomeCategory = categoryOverview.isIncome || (categoryDefinition?.isIncome == true)
                     Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = categoryOverview.categoryName,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MiuixTheme.colorScheme.onSurface
+                            )
+                            if (isIncomeCategory) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(MiuixGreen.copy(alpha = 0.15f))
+                                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = "收入",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MiuixGreen
+                                    )
+                                }
+                            }
+                        }
                         Text(
-                            text = categoryOverview.categoryName,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MiuixTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "已消费 ¥${MathFormulaEvaluator.formatAmount(categoryOverview.categoryActualSpent)} / 额度 ¥${MathFormulaEvaluator.formatAmount(categoryOverview.categoryActualAllocated)}",
+                            text = if (isIncomeCategory) {
+                                "计划入账 ¥${MathFormulaEvaluator.formatAmount(categoryOverview.categoryActualAllocated)} (累加至总资金池)"
+                            } else {
+                                "已消费 ¥${MathFormulaEvaluator.formatAmount(categoryOverview.categoryActualSpent)} / 额度 ¥${MathFormulaEvaluator.formatAmount(categoryOverview.categoryActualAllocated)}"
+                            },
                             fontSize = 12.sp,
                             color = MiuixTheme.colorScheme.onSurfaceSecondary
                         )
@@ -137,17 +163,22 @@ fun BudgetEnvelopeCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    val isIncomeCategory = categoryOverview.isIncome || (categoryDefinition?.isIncome == true)
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
-                            text = "剩余额度",
+                            text = if (isIncomeCategory) "增量注入" else "剩余额度",
                             fontSize = 11.sp,
                             color = MiuixTheme.colorScheme.onSurfaceSecondary
                         )
                         Text(
-                            text = "¥${MathFormulaEvaluator.formatAmount(categoryOverview.categoryBalance)}",
+                            text = if (isIncomeCategory) {
+                                "+¥${MathFormulaEvaluator.formatAmount(categoryOverview.categoryActualAllocated)}"
+                            } else {
+                                "¥${MathFormulaEvaluator.formatAmount(categoryOverview.categoryBalance)}"
+                            },
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (categoryOverview.categoryBalance < 0) MiuixRed else MiuixTheme.colorScheme.onSurface
+                            color = if (isIncomeCategory) MiuixGreen else if (categoryOverview.categoryBalance < 0) MiuixRed else MiuixTheme.colorScheme.onSurface
                         )
                     }
 

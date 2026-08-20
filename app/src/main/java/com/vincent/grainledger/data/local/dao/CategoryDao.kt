@@ -8,7 +8,7 @@ import com.vincent.grainledger.data.model.BudgetCategory
 /**
  * 分类数据访问对象 (CategoryDao)。
  *
- * 封装分类表的底层 SQL 查询、新增、更新、重命名级联与删除操作。
+ * 封装分类表的底层 SQL 查询、新增、更新、重命名级联与删除操作，支持收入/支出性质标识。
  */
 class CategoryDao(private val database: GrainLedgerDatabase) {
 
@@ -28,19 +28,22 @@ class CategoryDao(private val database: GrainLedgerDatabase) {
             "${GrainLedgerDatabase.COL_CAT_SORT} ASC"
         )
         cursor.use {
+            val isIncomeIdx = it.getColumnIndex(GrainLedgerDatabase.COL_CAT_IS_INCOME)
             while (it.moveToNext()) {
                 val id = it.getLong(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_CAT_ID))
                 val name = it.getString(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_CAT_NAME))
                 val icon = it.getString(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_CAT_ICON))
                 val colorValue = it.getLong(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_CAT_COLOR))
                 val sortOrder = it.getInt(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_CAT_SORT))
+                val isIncome = if (isIncomeIdx != -1) it.getInt(isIncomeIdx) == 1 else false
                 resultList.add(
                     BudgetCategory(
                         categoryId = id,
                         categoryName = name,
                         iconName = icon,
                         themeColorValue = colorValue,
-                        sortOrder = sortOrder
+                        sortOrder = sortOrder,
+                        isIncome = isIncome
                     )
                 )
             }
@@ -69,12 +72,15 @@ class CategoryDao(private val database: GrainLedgerDatabase) {
                 val icon = it.getString(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_CAT_ICON))
                 val colorValue = it.getLong(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_CAT_COLOR))
                 val sortOrder = it.getInt(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_CAT_SORT))
+                val isIncomeIdx = it.getColumnIndex(GrainLedgerDatabase.COL_CAT_IS_INCOME)
+                val isIncome = if (isIncomeIdx != -1) it.getInt(isIncomeIdx) == 1 else false
                 return BudgetCategory(
                     categoryId = id,
                     categoryName = catName,
                     iconName = icon,
                     themeColorValue = colorValue,
-                    sortOrder = sortOrder
+                    sortOrder = sortOrder,
+                    isIncome = isIncome
                 )
             }
         }
@@ -111,6 +117,7 @@ class CategoryDao(private val database: GrainLedgerDatabase) {
             put(GrainLedgerDatabase.COL_CAT_ICON, category.iconName)
             put(GrainLedgerDatabase.COL_CAT_COLOR, category.themeColorValue)
             put(GrainLedgerDatabase.COL_CAT_SORT, category.sortOrder)
+            put(GrainLedgerDatabase.COL_CAT_IS_INCOME, if (category.isIncome) 1 else 0)
         }
         return targetDb.insertWithOnConflict(
             GrainLedgerDatabase.TABLE_CATEGORIES,
@@ -130,6 +137,7 @@ class CategoryDao(private val database: GrainLedgerDatabase) {
             put(GrainLedgerDatabase.COL_CAT_ICON, newCategory.iconName)
             put(GrainLedgerDatabase.COL_CAT_COLOR, newCategory.themeColorValue)
             put(GrainLedgerDatabase.COL_CAT_SORT, newCategory.sortOrder)
+            put(GrainLedgerDatabase.COL_CAT_IS_INCOME, if (newCategory.isIncome) 1 else 0)
         }
 
         val rowsAffected = targetDb.update(

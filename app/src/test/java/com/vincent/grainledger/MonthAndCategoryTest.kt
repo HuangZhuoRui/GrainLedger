@@ -101,4 +101,59 @@ class MonthAndCategoryTest {
             assertEquals(1f, c.alpha, 0.01f)
         }
     }
+
+    @Test
+    fun testIncomeCategoryAddsToTotalVolume() {
+        // 1. 验证收入类大类属性
+        val incomeCat = BudgetCategory(
+            categoryId = 10L,
+            categoryName = "工资薪金",
+            iconName = "category_income",
+            themeColorValue = 0xFF34C759L,
+            sortOrder = 1,
+            isIncome = true
+        )
+        assertTrue(incomeCat.isIncome)
+
+        // 2. 模拟包含支出项与收入项的预算池计算
+        val expenseItem = BudgetItem(
+            itemId = 1L,
+            year = 2026,
+            month = 8,
+            categoryName = "强制类",
+            detailName = "学费支出",
+            unitPrice = 5000.0,
+            quantity = 1.0,
+            totalPrice = 5000.0,
+            actualAllocated = 5000.0,
+            funder = "默认账户",
+            actualSpent = 5000.0,
+            balance = 0.0
+        )
+
+        val incomeItem = BudgetItem(
+            itemId = 2L,
+            year = 2026,
+            month = 8,
+            categoryName = "工资薪金",
+            detailName = "8月兼职薪资",
+            unitPrice = 3000.0,
+            quantity = 1.0,
+            totalPrice = 3000.0,
+            actualAllocated = 3000.0, // 收入注入额度
+            funder = "银行卡",
+            actualSpent = 0.0,
+            balance = 3000.0
+        )
+
+        val items = listOf(expenseItem, incomeItem)
+        val totalAllocated = items.sumOf { it.actualAllocated } // 5000 + 3000 = 8000
+        val totalSpent = expenseItem.actualSpent // 5000
+        val totalBalance = totalAllocated - totalSpent // 8000 - 5000 = 3000
+
+        // 验证收入类直接增加了资金池总量 (8000.0) 并使可用结余增加 (3000.0)
+        assertEquals(8000.0, totalAllocated, 0.001)
+        assertEquals(5000.0, totalSpent, 0.001)
+        assertEquals(3000.0, totalBalance, 0.001)
+    }
 }

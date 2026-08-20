@@ -17,6 +17,7 @@ import com.vincent.grainledger.data.model.BudgetItem
 import com.vincent.grainledger.ui.components.card.MiuixSectionCard
 import com.vincent.grainledger.ui.components.display.StatusBadge
 import com.vincent.grainledger.ui.theme.MiuixBlue
+import com.vincent.grainledger.ui.theme.MiuixGreen
 import com.vincent.grainledger.util.MathFormulaEvaluator
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -63,9 +64,10 @@ fun BudgetCategoryGroup(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    val isIncome = categoryDefinition?.isIncome == true
                     StatusBadge(
-                        text = categoryName,
-                        color = themeColor,
+                        text = if (isIncome) "$categoryName (收入)" else categoryName,
+                        color = if (isIncome) MiuixGreen else themeColor,
                         fontSize = 13.sp
                     )
                     Text(
@@ -75,11 +77,16 @@ fun BudgetCategoryGroup(
                     )
                 }
 
+                val isIncome = categoryDefinition?.isIncome == true
                 Text(
-                    text = "注入 ¥${MathFormulaEvaluator.formatAmount(groupTotalAllocated)} / 结余 ¥${MathFormulaEvaluator.formatAmount(groupTotalBalance)}",
+                    text = if (isIncome) {
+                        "预计收入 ¥${MathFormulaEvaluator.formatAmount(groupTotalAllocated)}"
+                    } else {
+                        "注入 ¥${MathFormulaEvaluator.formatAmount(groupTotalAllocated)} / 结余 ¥${MathFormulaEvaluator.formatAmount(groupTotalBalance)}"
+                    },
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
-                    color = MiuixTheme.colorScheme.onSurfaceSecondary
+                    color = if (isIncome) MiuixGreen else MiuixTheme.colorScheme.onSurfaceSecondary
                 )
             }
 

@@ -35,6 +35,7 @@ class GrainLedgerDatabase private constructor(context: Context) : SQLiteOpenHelp
         const val COL_CAT_ICON = "icon"
         const val COL_CAT_COLOR = "color_value"
         const val COL_CAT_SORT = "sort_order"
+        const val COL_CAT_IS_INCOME = "is_income"
 
         // 预算细项表常量
         const val TABLE_BUDGET_ITEMS = "budget_items"
@@ -92,7 +93,8 @@ class GrainLedgerDatabase private constructor(context: Context) : SQLiteOpenHelp
                 $COL_CAT_NAME TEXT NOT NULL UNIQUE,
                 $COL_CAT_ICON TEXT NOT NULL,
                 $COL_CAT_COLOR INTEGER NOT NULL,
-                $COL_CAT_SORT INTEGER NOT NULL DEFAULT 0
+                $COL_CAT_SORT INTEGER NOT NULL DEFAULT 0,
+                $COL_CAT_IS_INCOME INTEGER NOT NULL DEFAULT 0
             );
         """.trimIndent()
         db.execSQL(createCategoriesSql)
@@ -140,6 +142,27 @@ class GrainLedgerDatabase private constructor(context: Context) : SQLiteOpenHelp
         seedInitialDatabaseData(db)
     }
 
+    override fun onOpen(db: SQLiteDatabase) {
+        super.onOpen(db)
+        // 自动检测并补齐 is_income 列（若旧版数据库尚未包含）
+        try {
+            val cursor = db.rawQuery("PRAGMA table_info($TABLE_CATEGORIES)", null)
+            var hasIsIncome = false
+            cursor.use {
+                val nameIndex = it.getColumnIndex("name")
+                while (it.moveToNext()) {
+                    if (nameIndex != -1 && it.getString(nameIndex) == COL_CAT_IS_INCOME) {
+                        hasIsIncome = true
+                        break
+                    }
+                }
+            }
+            if (!hasIsIncome) {
+                db.execSQL("ALTER TABLE $TABLE_CATEGORIES ADD COLUMN $COL_CAT_IS_INCOME INTEGER NOT NULL DEFAULT 0")
+            }
+        } catch (_: Exception) {}
+    }
+
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // 数据库迁移逻辑
     }
@@ -170,6 +193,7 @@ class GrainLedgerDatabase private constructor(context: Context) : SQLiteOpenHelp
                 put(COL_CAT_ICON, category.iconName)
                 put(COL_CAT_COLOR, category.themeColorValue)
                 put(COL_CAT_SORT, category.sortOrder)
+                put(COL_CAT_IS_INCOME, if (category.isIncome) 1 else 0)
             }
             db.insertWithOnConflict(TABLE_CATEGORIES, null, values, SQLiteDatabase.CONFLICT_REPLACE)
         }

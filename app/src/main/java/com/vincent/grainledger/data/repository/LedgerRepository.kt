@@ -309,22 +309,36 @@ class LedgerRepository(context: Context) {
 
         val totalPlanned = BigDecimal(budgetItems.sumOf { it.totalPrice }).setScale(2, RoundingMode.HALF_UP).toDouble()
         val totalAllocated = BigDecimal(budgetItems.sumOf { it.actualAllocated }).setScale(2, RoundingMode.HALF_UP).toDouble()
-        val totalSpent = BigDecimal(budgetItems.sumOf { it.actualSpent }).setScale(2, RoundingMode.HALF_UP).toDouble()
+
+        // 区分收入类分类与支出类分类
+        val incomeItems = budgetItems.filter { categoryMap[it.categoryName]?.isIncome == true }
+        val expenseItems = budgetItems.filter { categoryMap[it.categoryName]?.isIncome != true }
+
+        val totalIncome = BigDecimal(incomeItems.sumOf { it.actualAllocated }).setScale(2, RoundingMode.HALF_UP).toDouble()
+        val totalSpent = BigDecimal(expenseItems.sumOf { it.actualSpent }).setScale(2, RoundingMode.HALF_UP).toDouble()
+        // 当月可用结余 = 总资金量（基础预算注入 + 收入类金额） - 总支出消费
         val totalBalance = BigDecimal(totalAllocated - totalSpent).setScale(2, RoundingMode.HALF_UP).toDouble()
 
         // 按分类聚合
         val categoryGroups = budgetItems.groupBy { it.categoryName }
         val categoryOverviewList = categoryGroups.map { (categoryName, items) ->
+            val catDef = categoryMap[categoryName]
+            val isIncomeCat = catDef?.isIncome ?: false
             val budgetTotal = BigDecimal(items.sumOf { it.totalPrice }).setScale(2, RoundingMode.HALF_UP).toDouble()
             val allocatedTotal = BigDecimal(items.sumOf { it.actualAllocated }).setScale(2, RoundingMode.HALF_UP).toDouble()
             val spentTotal = BigDecimal(items.sumOf { it.actualSpent }).setScale(2, RoundingMode.HALF_UP).toDouble()
-            val balanceTotal = BigDecimal(allocatedTotal - spentTotal).setScale(2, RoundingMode.HALF_UP).toDouble()
+            val balanceTotal = if (isIncomeCat) {
+                BigDecimal(allocatedTotal).setScale(2, RoundingMode.HALF_UP).toDouble()
+            } else {
+                BigDecimal(allocatedTotal - spentTotal).setScale(2, RoundingMode.HALF_UP).toDouble()
+            }
             CategoryOverview(
                 categoryName = categoryName,
                 categoryTotalBudget = budgetTotal,
                 categoryActualAllocated = allocatedTotal,
                 categoryActualSpent = spentTotal,
                 categoryBalance = balanceTotal,
+                isIncome = isIncomeCat,
                 budgetItemList = items
             )
         }.sortedBy { categoryMap[it.categoryName]?.sortOrder ?: 99 }
@@ -336,6 +350,7 @@ class LedgerRepository(context: Context) {
             totalActualAllocated = totalAllocated,
             totalActualSpent = totalSpent,
             totalBalance = totalBalance,
+            totalIncome = totalIncome,
             categoryOverviewList = categoryOverviewList
         )
     }
