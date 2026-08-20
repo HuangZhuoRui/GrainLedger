@@ -1,4 +1,4 @@
-package com.vincent.grainledger.ui.components
+package com.vincent.grainledger.ui.components.card
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -39,6 +39,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * 帮助用户在制定月度预算时确保资金完全平衡。
  *
  * @param balanceCheckResult 检查结果模型
+ * @param modifier 外部修饰符
  */
 @Composable
 fun CapitalBalanceCard(

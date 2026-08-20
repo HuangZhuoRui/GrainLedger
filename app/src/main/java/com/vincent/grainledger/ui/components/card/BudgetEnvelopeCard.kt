@@ -1,4 +1,4 @@
-package com.vincent.grainledger.ui.components
+package com.vincent.grainledger.ui.components.card
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -53,6 +53,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * @param categoryOverview 大类聚合数据
  * @param categoryDefinition 分类样式定义
  * @param onBudgetItemClick 点击具体预算项时的回调
+ * @param modifier 外部修饰符
  */
 @Composable
 fun BudgetEnvelopeCard(

@@ -1,4 +1,4 @@
-package com.vincent.grainledger.ui.components
+package com.vincent.grainledger.ui.components.control
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -29,7 +29,7 @@ import com.vincent.grainledger.ui.theme.MiuixShapes
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * MIUIX 风格月份胶囊选择条。
+ * MIUIX 风格月份胶囊选择条 (MiuixMonthSelector)。
  *
  * 支持水平流畅滑动，选中月份带有平滑弹性缩放与色彩渐变过渡。
  *
@@ -37,6 +37,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * @param currentYear 当前选中的年份
  * @param currentMonth 当前选中的月份
  * @param onMonthSelected 切换月份时的回调函数
+ * @param modifier 外部修饰符
  */
 @Composable
 fun MiuixMonthSelector(

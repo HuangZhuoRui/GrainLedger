@@ -56,6 +56,7 @@ import com.vincent.grainledger.data.updater.DownloadProgress
 import com.vincent.grainledger.data.updater.DownloadStatus
 import com.vincent.grainledger.data.updater.GitHubRelease
 import com.vincent.grainledger.data.updater.UpdateCheckState
+import com.vincent.grainledger.ui.components.feedback.DownloadProgressPanel
 import com.vincent.grainledger.ui.theme.MiuixBlue
 import com.vincent.grainledger.ui.theme.MiuixGreen
 import com.vincent.grainledger.ui.theme.MiuixRed
@@ -317,43 +318,10 @@ private fun HasUpdateView(
 
         // 下载进度显示或操作按钮
         if (isDownloading) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                LinearProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(CircleShape),
-                    color = MiuixBlue,
-                    trackColor = MiuixTheme.colorScheme.surfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = downloadProgress.formattedSizeProgress,
-                        fontSize = 12.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary
-                    )
-                    Text(
-                        text = downloadProgress.formattedSpeed,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MiuixBlue
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-                OutlinedButton(
-                    onClick = onCancelDownload,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Text(text = "取消下载", color = MiuixRed)
-                }
-            }
+            DownloadProgressPanel(
+                downloadProgress = downloadProgress,
+                onCancelDownload = onCancelDownload
+            )
         } else {
             Column(
                 modifier = Modifier.fillMaxWidth(),

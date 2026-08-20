@@ -183,6 +183,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * 删除指定交易流水（对象重载）。
+     */
+    fun deleteTransaction(record: TransactionRecord) {
+        deleteTransaction(record.recordId)
+    }
+
+    /**
+     * 重置数据库为默认初始测试数据。
+     */
+    fun resetToDefault() {
+        viewModelScope.launch {
+            repository.resetDatabaseToDefaults()
+            _toastMessage.value = "已成功重置为初始默认账目数据！"
+            loadAllData()
+        }
+    }
+
+    /**
      * 保存或编辑预算细项。
      */
     fun saveBudgetItem(item: BudgetItem) {

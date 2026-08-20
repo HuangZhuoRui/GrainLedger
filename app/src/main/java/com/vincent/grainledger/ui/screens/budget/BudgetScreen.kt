@@ -1,21 +1,16 @@
 package com.vincent.grainledger.ui.screens.budget
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -32,22 +27,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vincent.grainledger.data.model.BudgetItem
-import com.vincent.grainledger.ui.components.MiuixMonthSelector
+import com.vincent.grainledger.ui.components.control.MiuixMonthSelector
+import com.vincent.grainledger.ui.components.feedback.EmptyStateView
+import com.vincent.grainledger.ui.components.layout.PageHeader
+import com.vincent.grainledger.ui.screens.budget.components.BudgetCategoryGroup
+import com.vincent.grainledger.ui.screens.budget.components.BudgetSummaryCard
 import com.vincent.grainledger.ui.theme.MiuixBlue
-import com.vincent.grainledger.ui.theme.MiuixRed
 import com.vincent.grainledger.ui.theme.MiuixShapes
 import com.vincent.grainledger.ui.viewmodel.MainViewModel
-import com.vincent.grainledger.util.MathFormulaEvaluator
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * 预算管理与规划页面。
+ * 预算管理与规划页面 (BudgetScreen)。
  *
- * 对应 Excel 表格中的《数据源》全部行记录，按月份与大类结构化展示每一个预算细项的
- * 单价、数量、总价预算、实际加入资金、实际消费及当前结余，支持可视化新增、修改与删除。
+ * 遵循单一数据源 (SSOT) 原则，全响应式展示当前月份的预算细项、
+ * 按大类聚合分组卡片与统计汇总，支持可视化新增、编辑与删除。
  *
  * @param viewModel 全局视图模型
+ * @param modifier 外部修饰符
  */
 @Composable
 fun BudgetScreen(
@@ -59,6 +55,7 @@ fun BudgetScreen(
     val availableMonths by viewModel.availableMonths.collectAsState()
     val budgetItemList by viewModel.currentBudgetItems.collectAsState()
     val allCategories by viewModel.allCategories.collectAsState()
+    val categoryMap = remember(allCategories) { allCategories.associateBy { it.categoryName } }
 
     var editingBudgetItem by remember { mutableStateOf<BudgetItem?>(null) }
     var showEditDialog by remember { mutableStateOf(false) }
@@ -76,23 +73,10 @@ fun BudgetScreen(
         ) {
             // 1. 顶部标题
             item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 4.dp)
-                ) {
-                    Text(
-                        text = "预算管理",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MiuixTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "规划每月开支细项与资金注入额度",
-                        fontSize = 12.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary
-                    )
-                }
+                PageHeader(
+                    title = "预算管理",
+                    subtitle = "规划每月开支细项与资金注入额度"
+                )
             }
 
             // 2. 月份选择胶囊
@@ -109,201 +93,34 @@ fun BudgetScreen(
 
             // 3. 统计汇总头部卡片
             item {
-                val totalBudget = budgetItemList.sumOf { it.totalPrice }
-                val totalAllocated = budgetItemList.sumOf { it.actualAllocated }
-                val totalSpent = budgetItemList.sumOf { it.actualSpent }
-                val totalBalance = totalAllocated - totalSpent
-
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    cornerRadius = 20.dp
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                text = "规划总预算",
-                                fontSize = 11.sp,
-                                color = MiuixTheme.colorScheme.onSurfaceSecondary
-                            )
-                            Text(
-                                text = "¥${MathFormulaEvaluator.formatAmount(totalBudget)}",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MiuixTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        Column {
-                            Text(
-                                text = "实际加入(注入)",
-                                fontSize = 11.sp,
-                                color = MiuixTheme.colorScheme.onSurfaceSecondary
-                            )
-                            Text(
-                                text = "¥${MathFormulaEvaluator.formatAmount(totalAllocated)}",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MiuixBlue
-                            )
-                        }
-
-                        Column {
-                            Text(
-                                text = "剩余总结余",
-                                fontSize = 11.sp,
-                                color = MiuixTheme.colorScheme.onSurfaceSecondary
-                            )
-                            Text(
-                                text = "¥${MathFormulaEvaluator.formatAmount(totalBalance)}",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (totalBalance < 0) MiuixRed else MiuixTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
+                BudgetSummaryCard(budgetItemList = budgetItemList)
             }
 
-            // 4. 按类别列出各项预算
-            if (categoryGroupMap.isEmpty()) {
+            // 4. 大类分组预算列表
+            if (budgetItemList.isEmpty()) {
                 item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(40.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "本月暂无预算规划，点击右下角按钮添加",
-                            fontSize = 14.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceSecondary
-                        )
-                    }
+                    EmptyStateView(
+                        title = "本月暂无预算规划",
+                        message = "点击右下角按钮添加第一个预算细项吧"
+                    )
                 }
             } else {
-                categoryGroupMap.forEach { (categoryName, itemList) ->
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 18.dp, end = 18.dp, top = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = categoryName,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MiuixTheme.colorScheme.onSurface
-                            )
-                            val categoryAllocatedTotal = itemList.sumOf { it.actualAllocated }
-                            Text(
-                                text = "注入合计: ¥${MathFormulaEvaluator.formatAmount(categoryAllocatedTotal)}",
-                                fontSize = 12.sp,
-                                color = MiuixTheme.colorScheme.onSurfaceSecondary
-                            )
+                items(categoryGroupMap.keys.toList(), key = { it }) { categoryName ->
+                    val items = categoryGroupMap[categoryName] ?: emptyList()
+                    BudgetCategoryGroup(
+                        categoryName = categoryName,
+                        categoryDefinition = categoryMap[categoryName],
+                        items = items,
+                        onEditItem = { item ->
+                            editingBudgetItem = item
+                            showEditDialog = true
                         }
-                    }
-
-                    items(itemList, key = { it.itemId }) { item ->
-                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        editingBudgetItem = item
-                                        showEditDialog = true
-                                    },
-                                cornerRadius = 16.dp
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(14.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Text(
-                                                text = item.detailName,
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MiuixTheme.colorScheme.onSurface
-                                            )
-                                            if (item.funder != "默认账户" && item.funder.isNotEmpty()) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .background(
-                                                            MiuixTheme.colorScheme.surfaceVariant,
-                                                            MiuixShapes.SmallSquircle
-                                                        )
-                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                                ) {
-                                                    Text(
-                                                        text = item.funder,
-                                                        fontSize = 10.sp,
-                                                        color = MiuixTheme.colorScheme.onSurfaceSecondary
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Text(
-                                            text = if (item.quantity > 1.0) {
-                                                "单价 ¥${MathFormulaEvaluator.formatAmount(item.unitPrice)} × ${item.quantity} = 预算 ¥${MathFormulaEvaluator.formatAmount(item.totalPrice)}"
-                                            } else {
-                                                "总额预算 ¥${MathFormulaEvaluator.formatAmount(item.totalPrice)}"
-                                            },
-                                            fontSize = 12.sp,
-                                            color = MiuixTheme.colorScheme.onSurfaceSecondary
-                                        )
-                                    }
-
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Column(horizontalAlignment = Alignment.End) {
-                                            Text(
-                                                text = "剩余 ¥${MathFormulaEvaluator.formatAmount(item.balance)}",
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (item.balance < 0) MiuixRed else MiuixTheme.colorScheme.onSurface
-                                            )
-                                            Text(
-                                                text = "已花 ¥${MathFormulaEvaluator.formatAmount(item.actualSpent)} / 加入 ¥${MathFormulaEvaluator.formatAmount(item.actualAllocated)}",
-                                                fontSize = 11.sp,
-                                                color = MiuixTheme.colorScheme.onSurfaceSecondary
-                                            )
-                                        }
-
-                                        Icon(
-                                            imageVector = Icons.Default.Edit,
-                                            contentDescription = "编辑",
-                                            tint = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.5f),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    )
                 }
             }
         }
 
-        // 新增预算项悬浮按钮
+        // 悬浮新增预算细项按钮
         FloatingActionButton(
             onClick = {
                 editingBudgetItem = null
@@ -321,24 +138,34 @@ fun BudgetScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
-                Text(text = "添加预算", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "新增预算",
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    text = "加预算",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
 
-    // 预算编辑弹窗
+    // 预算编辑/新增弹窗
     if (showEditDialog) {
         EditBudgetItemDialog(
             targetItem = editingBudgetItem,
             year = currentYear,
             month = currentMonth,
             categoryList = allCategories,
-            onSave = { newItem ->
-                viewModel.saveBudgetItem(newItem)
+            onSave = { savedItem ->
+                viewModel.saveBudgetItem(savedItem)
+                showEditDialog = false
             },
-            onDelete = { itemId ->
-                viewModel.deleteBudgetItem(itemId)
+            onDelete = { deletedItem ->
+                viewModel.deleteBudgetItem(deletedItem)
+                showEditDialog = false
             },
             onDismissRequest = {
                 showEditDialog = false
