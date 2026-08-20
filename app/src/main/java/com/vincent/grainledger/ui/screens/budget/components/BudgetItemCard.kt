@@ -17,28 +17,33 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vincent.grainledger.data.model.BudgetItem
 import com.vincent.grainledger.ui.components.display.AmountText
 import com.vincent.grainledger.ui.theme.MiuixBlue
+import com.vincent.grainledger.ui.theme.MiuixGreen
 import com.vincent.grainledger.ui.theme.MiuixRed
 import com.vincent.grainledger.ui.theme.MiuixShapes
+import com.vincent.grainledger.util.MathFormulaEvaluator
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * 单个预算条目卡片 (BudgetItemCard)。
+ * 单个预算/收入条目卡片 (BudgetItemCard)。
  *
- * 展示预算细项名称、单价/数量、注入金额、已花金额、实时结余，并支持点击编辑。
+ * 智能感知大类收入/支出属性，展示精准对应的细项名称、单价/数量、注入/到账金额、已花金额与实时结余。
  *
  * @param budgetItem 预算实体
+ * @param isIncome 是否为收入类细项
  * @param onEditClick 点击编辑回调
  * @param modifier 外部修饰符
  */
 @Composable
 fun BudgetItemCard(
     budgetItem: BudgetItem,
+    isIncome: Boolean = false,
     onEditClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -78,10 +83,18 @@ fun BudgetItemCard(
             }
 
             Text(
-                text = if (budgetItem.quantity > 1.0) {
-                    "单价 ¥${budgetItem.unitPrice} × ${budgetItem.quantity} = 总价 ¥${budgetItem.totalPrice}"
+                text = if (isIncome) {
+                    if (budgetItem.quantity > 1.0) {
+                        "单价 ¥${MathFormulaEvaluator.formatAmount(budgetItem.unitPrice)} × ${budgetItem.quantity} = 预估 ¥${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)}"
+                    } else {
+                        "预估收入: ¥${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)}"
+                    }
                 } else {
-                    "预算总价: ¥${budgetItem.totalPrice}"
+                    if (budgetItem.quantity > 1.0) {
+                        "单价 ¥${MathFormulaEvaluator.formatAmount(budgetItem.unitPrice)} × ${budgetItem.quantity} = 总价 ¥${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)}"
+                    } else {
+                        "预算总价: ¥${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)}"
+                    }
                 },
                 fontSize = 11.5.sp,
                 color = MiuixTheme.colorScheme.onSurfaceSecondary
@@ -93,36 +106,60 @@ fun BudgetItemCard(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Column(horizontalAlignment = Alignment.End) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isIncome) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "到账: ",
+                            fontSize = 12.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceSecondary
+                        )
+                        Text(
+                            text = "+¥${MathFormulaEvaluator.formatAmount(budgetItem.actualAllocated)}",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MiuixGreen
+                        )
+                    }
                     Text(
-                        text = "剩余: ",
-                        fontSize = 12.sp,
+                        text = "收款: ${budgetItem.funder}",
+                        fontSize = 11.sp,
                         color = MiuixTheme.colorScheme.onSurfaceSecondary
                     )
-                    AmountText(
-                        amount = budgetItem.balance,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (budgetItem.balance < 0) MiuixRed else MiuixTheme.colorScheme.onSurface
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "剩余: ",
+                            fontSize = 12.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceSecondary
+                        )
+                        AmountText(
+                            amount = budgetItem.balance,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (budgetItem.balance < 0) MiuixRed else MiuixTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        text = "已花 ¥${MathFormulaEvaluator.formatAmount(budgetItem.actualSpent)} / 注入 ¥${MathFormulaEvaluator.formatAmount(budgetItem.actualAllocated)}",
+                        fontSize = 11.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary
                     )
                 }
-                Text(
-                    text = "已花 ¥${budgetItem.actualSpent} / 注入 ¥${budgetItem.actualAllocated}",
-                    fontSize = 11.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceSecondary
-                )
             }
 
             Box(
                 modifier = Modifier
                     .size(28.dp)
-                    .background(MiuixBlue.copy(alpha = 0.1f), CircleShape),
+                    .background(
+                        (if (isIncome) MiuixGreen else MiuixBlue).copy(alpha = 0.12f),
+                        CircleShape
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = "编辑",
-                    tint = MiuixBlue,
+                    tint = if (isIncome) MiuixGreen else MiuixBlue,
                     modifier = Modifier.size(15.dp)
                 )
             }

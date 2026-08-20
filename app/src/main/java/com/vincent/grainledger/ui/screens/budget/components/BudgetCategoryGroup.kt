@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,7 +23,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 /**
  * 预算大类分组卡片 (BudgetCategoryGroup)。
  *
- * 将属于同一大类（如“强制类”、“饮食类”）的预算细项包裹并展示大类统计汇总。
+ * 将属于同一大类（如“强制类”、“饮食类”或“收入类”）的预算细项包裹并展示大类统计汇总。
  *
  * @param categoryName 大类名称
  * @param categoryDefinition 分类样式定义
@@ -40,7 +39,8 @@ fun BudgetCategoryGroup(
     onEditItem: (BudgetItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val themeColor = categoryDefinition?.themeColor ?: MiuixBlue
+    val isIncome = categoryDefinition?.isIncome == true
+    val themeColor = categoryDefinition?.themeColor ?: if (isIncome) MiuixGreen else MiuixBlue
     val groupTotalBudget = items.sumOf { it.totalPrice }
     val groupTotalAllocated = items.sumOf { it.actualAllocated }
     val groupTotalSpent = items.sumOf { it.actualSpent }
@@ -64,10 +64,9 @@ fun BudgetCategoryGroup(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val isIncome = categoryDefinition?.isIncome == true
                     StatusBadge(
                         text = if (isIncome) "$categoryName (收入)" else categoryName,
-                        color = if (isIncome) MiuixGreen else themeColor,
+                        color = themeColor,
                         fontSize = 13.sp
                     )
                     Text(
@@ -77,7 +76,6 @@ fun BudgetCategoryGroup(
                     )
                 }
 
-                val isIncome = categoryDefinition?.isIncome == true
                 Text(
                     text = if (isIncome) {
                         "预计收入 ¥${MathFormulaEvaluator.formatAmount(groupTotalAllocated)}"
@@ -94,6 +92,7 @@ fun BudgetCategoryGroup(
             items.forEach { item ->
                 BudgetItemCard(
                     budgetItem = item,
+                    isIncome = isIncome,
                     onEditClick = { onEditItem(item) }
                 )
             }

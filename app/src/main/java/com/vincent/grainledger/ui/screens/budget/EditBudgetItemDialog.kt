@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -32,6 +33,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.vincent.grainledger.data.model.BudgetCategory
 import com.vincent.grainledger.data.model.BudgetItem
 import com.vincent.grainledger.ui.theme.MiuixBlue
+import com.vincent.grainledger.ui.theme.MiuixGreen
 import com.vincent.grainledger.ui.theme.MiuixRed
 import com.vincent.grainledger.ui.theme.MiuixShapes
 import com.vincent.grainledger.util.MathFormulaEvaluator
@@ -40,10 +42,9 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * 预算细项新增与编辑弹窗。
+ * 预算细项新增与编辑弹窗 (EditBudgetItemDialog)。
  *
- * 支持设定单价、数量、总价预算与实际加入（资金注入）额度，
- * 支持在单价或总额输入框中直接输入算式（例如 30+50、39+26+5+5）。
+ * 自动根据所选类别的【收入/支出】性质动态变换标题、输入项名称、说明占位符、提示横幅与保存按钮。
  *
  * @param targetItem 待编辑的预算项（若为 null 则代表新增）
  * @param year 当前年份
@@ -71,6 +72,12 @@ fun EditBudgetItemDialog(
     var funder by remember { mutableStateOf(targetItem?.funder ?: "默认账户") }
     var remark by remember { mutableStateOf(targetItem?.remark ?: "") }
 
+    // 动态感知所选分类是否为收入类
+    val selectedCategoryDef = remember(selectedCategory, categoryList) {
+        categoryList.find { it.categoryName == selectedCategory }
+    }
+    val isIncome = selectedCategoryDef?.isIncome ?: false
+
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -88,18 +95,60 @@ fun EditBudgetItemDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // 顶部标题
-                Text(
-                    text = if (targetItem == null) "新增预算项" else "编辑预算项",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.onSurface
-                )
+                // 顶部标题（根据收入/支出动态切换）
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (targetItem == null) {
+                            if (isIncome) "新增收入规划项" else "新增支出预算项"
+                        } else {
+                            if (isIncome) "编辑收入项" else "编辑支出预算项"
+                        },
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MiuixTheme.colorScheme.onSurface
+                    )
 
-                // 1. 归属分类选择
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isIncome) MiuixGreen.copy(alpha = 0.15f) else MiuixBlue.copy(alpha = 0.15f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = if (isIncome) "+ 收入类" else "- 支出类",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isIncome) MiuixGreen else MiuixBlue
+                        )
+                    }
+                }
+
+                // 收入属性全局提示卡片
+                if (isIncome) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MiuixShapes.SmallSquircle)
+                            .background(MiuixGreen.copy(alpha = 0.12f))
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "💡 本项归属于【收入类】：保存后该金额将作为新增资金直接累加至当月资金池（总量）与可用结余中。",
+                            fontSize = 12.sp,
+                            color = MiuixGreen,
+                            lineHeight = 17.sp
+                        )
+                    }
+                }
+
+                // 1. 归属大类选择（展示收入/支出类别标签）
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = "归属类别",
+                        text = "选择归属类别",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MiuixTheme.colorScheme.onSurface
@@ -112,39 +161,60 @@ fun EditBudgetItemDialog(
                     ) {
                         categoryList.forEach { category ->
                             val isSelected = (category.categoryName == selectedCategory)
+                            val catIsIncome = category.isIncome
                             Box(
                                 modifier = Modifier
+                                    .clip(MiuixShapes.SmallSquircle)
                                     .background(
-                                        color = if (isSelected) MiuixBlue else MiuixTheme.colorScheme.surfaceVariant,
-                                        shape = MiuixShapes.SmallSquircle
+                                        color = if (isSelected) {
+                                            if (catIsIncome) MiuixGreen else MiuixBlue
+                                        } else {
+                                            MiuixTheme.colorScheme.surfaceVariant
+                                        }
                                     )
                                     .clickable {
                                         selectedCategory = category.categoryName
                                     }
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
-                                Text(
-                                    text = category.categoryName,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) Color.White else MiuixTheme.colorScheme.onSurface
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = category.categoryName,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) Color.White else MiuixTheme.colorScheme.onSurface
+                                    )
+                                    if (catIsIncome) {
+                                        Text(
+                                            text = "(入)",
+                                            fontSize = 10.5.sp,
+                                            color = if (isSelected) Color.White.copy(alpha = 0.85f) else MiuixGreen
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
                 }
 
-                // 2. 细项名称
+                // 2. 细项名称输入框
                 OutlinedTextField(
                     value = detailName,
                     onValueChange = { detailName = it },
-                    label = { Text(text = "预算细项名称 (如 房租、餐饮)") },
+                    label = {
+                        Text(
+                            text = if (isIncome) "收入来源细项 (如 基本工资、绩效奖金、兼职报酬、理财收益)" else "预算细项名称 (如 房租物业、餐饮外卖、生活用品)"
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MiuixShapes.MediumSquircle,
                     singleLine = true
                 )
 
-                // 3. 单价与数量（支持公式算式）
+                // 3. 单价/金额与数量/频次（支持公式算式）
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -152,7 +222,11 @@ fun EditBudgetItemDialog(
                     OutlinedTextField(
                         value = unitPriceInput,
                         onValueChange = { unitPriceInput = it },
-                        label = { Text(text = "单价/基准额 (支持如 30+50)") },
+                        label = {
+                            Text(
+                                text = if (isIncome) "预计收入 (支持如 3000+500)" else "单价/基准额 (支持如 30+50)"
+                            )
+                        },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1.3f),
                         shape = MiuixShapes.MediumSquircle,
@@ -162,7 +236,11 @@ fun EditBudgetItemDialog(
                     OutlinedTextField(
                         value = quantityInput,
                         onValueChange = { quantityInput = it },
-                        label = { Text(text = "数量/月数") },
+                        label = {
+                            Text(
+                                text = if (isIncome) "预计频次/笔数" else "数量/月数"
+                            )
+                        },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(0.7f),
                         shape = MiuixShapes.MediumSquircle,
@@ -170,22 +248,34 @@ fun EditBudgetItemDialog(
                     )
                 }
 
-                // 4. 实际加入额度 (注入资金，留空则默认等同于总价)
+                // 4. 实际加入/到账额度
                 OutlinedTextField(
                     value = actualAllocatedInput,
                     onValueChange = { actualAllocatedInput = it },
-                    label = { Text(text = "实际加入额度 (留空则默认为总价预算)") },
+                    label = {
+                        Text(
+                            text = if (isIncome) {
+                                "实际到账额度 (留空默认等同于预计收入，累加至总量)"
+                            } else {
+                                "实际加入额度 (资金注入，留空默认等同于总价预算)"
+                            }
+                        )
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
                     shape = MiuixShapes.MediumSquircle,
                     singleLine = true
                 )
 
-                // 5. 资金出处 / 账户
+                // 5. 账户与渠道
                 OutlinedTextField(
                     value = funder,
                     onValueChange = { funder = it },
-                    label = { Text(text = "资金出处 / 账户") },
+                    label = {
+                        Text(
+                            text = if (isIncome) "入账收款账户 (如 工资卡、微信零钱、支付宝)" else "资金出处 / 扣款账户 (如 招商银行卡、微信零钱)"
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MiuixShapes.MediumSquircle,
                     singleLine = true
@@ -195,7 +285,11 @@ fun EditBudgetItemDialog(
                 OutlinedTextField(
                     value = remark,
                     onValueChange = { remark = it },
-                    label = { Text(text = "备注说明 (选填)") },
+                    label = {
+                        Text(
+                            text = if (isIncome) "收入说明备注 (选填)" else "支出说明备注 (选填)"
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MiuixShapes.MediumSquircle,
                     singleLine = true
@@ -253,7 +347,7 @@ fun EditBudgetItemDialog(
                                     actualAllocated = actualAllocated,
                                     funder = funder,
                                     actualSpent = targetItem?.actualSpent ?: 0.0,
-                                    balance = actualAllocated - (targetItem?.actualSpent ?: 0.0),
+                                    balance = if (isIncome) actualAllocated else actualAllocated - (targetItem?.actualSpent ?: 0.0),
                                     remark = remark
                                 )
                                 onSave(newItem)
@@ -261,9 +355,15 @@ fun EditBudgetItemDialog(
                             }
                         },
                         modifier = Modifier.weight(1.2f),
-                        colors = ButtonDefaults.buttonColors(color = MiuixBlue)
+                        colors = ButtonDefaults.buttonColors(
+                            color = if (isIncome) MiuixGreen else MiuixBlue
+                        )
                     ) {
-                        Text(text = "保存预算", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = if (isIncome) "保存收入" else "保存预算",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
