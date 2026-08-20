@@ -36,6 +36,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = LedgerRepository(application)
     private val updaterService = AppUpdaterService()
 
+    // 当前选中的底部导航页签索引（0: 看板, 1: 预算, 2: 流水, 3: 设置）
+    private val _selectedTabIndex = MutableStateFlow(0)
+    val selectedTabIndex: StateFlow<Int> = _selectedTabIndex.asStateFlow()
+
+    fun setSelectedTabIndex(index: Int) {
+        _selectedTabIndex.value = index
+    }
+
     // 当前选中的年份与月份（默认为 2026年 8月）
     private val _currentYear = MutableStateFlow(2026)
     val currentYear: StateFlow<Int> = _currentYear.asStateFlow()

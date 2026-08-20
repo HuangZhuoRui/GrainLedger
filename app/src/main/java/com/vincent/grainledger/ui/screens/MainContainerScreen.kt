@@ -31,7 +31,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -96,7 +95,7 @@ fun MainContainerScreen(
     val updateCheckState by viewModel.updateCheckState.collectAsState()
     val downloadProgress by viewModel.downloadProgress.collectAsState()
 
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val selectedTabIndex by viewModel.selectedTabIndex.collectAsState()
     var showBookkeepingDialog by remember { mutableStateOf(false) }
     var editingBudgetItem by remember { mutableStateOf<BudgetItem?>(null) }
     var showBudgetEditDialog by remember { mutableStateOf(false) }
@@ -112,13 +111,6 @@ fun MainContainerScreen(
     }
     BackHandler(enabled = showBudgetEditDialog) {
         showBudgetEditDialog = false
-    }
-
-    // 当不在看板页时，按下系统返回键切回看板首页
-    BackHandler(
-        enabled = !showBookkeepingDialog && !showBudgetEditDialog && selectedTabIndex != 0
-    ) {
-        selectedTabIndex = 0
     }
 
     // 提示信息监听
@@ -230,7 +222,7 @@ fun MainContainerScreen(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
                                 ) {
-                                    selectedTabIndex = tab.index
+                                    viewModel.setSelectedTabIndex(tab.index)
                                 }
                                 .padding(horizontal = 14.dp, vertical = 6.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
