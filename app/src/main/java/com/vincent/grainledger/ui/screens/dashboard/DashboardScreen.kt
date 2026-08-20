@@ -26,7 +26,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vincent.grainledger.data.model.BalanceCheckResult
 import com.vincent.grainledger.data.model.BudgetItem
+import com.vincent.grainledger.data.model.MonthlyOverview
 import com.vincent.grainledger.ui.components.card.BudgetEnvelopeCard
 import com.vincent.grainledger.ui.components.card.CapitalBalanceCard
 import com.vincent.grainledger.ui.components.card.IncomeEnvelopeCard
@@ -62,8 +64,8 @@ fun DashboardScreen(
     val currentYear by viewModel.currentYear.collectAsState()
     val currentMonth by viewModel.currentMonth.collectAsState()
     val availableMonths by viewModel.availableMonths.collectAsState()
-    val monthlyOverview by viewModel.monthlyOverview.collectAsState()
-    val balanceCheckResult by viewModel.balanceCheckResult.collectAsState()
+    val monthlyOverviewMap by viewModel.monthlyOverviewMap.collectAsState()
+    val balanceCheckMap by viewModel.balanceCheckMap.collectAsState()
     val allCategories by viewModel.allCategories.collectAsState()
     val categoryMap = remember(allCategories) { allCategories.associateBy { it.categoryName } }
 
@@ -124,6 +126,10 @@ fun DashboardScreen(
             }
         }
     ) { targetYear, targetMonth ->
+        // 瞬间从全量预载内存缓存中读取当前目标月份的数据，0 延迟秒级呈现
+        val itemOverview = monthlyOverviewMap[Pair(targetYear, targetMonth)] ?: MonthlyOverview(targetYear, targetMonth)
+        val itemBalanceCheck = balanceCheckMap[Pair(targetYear, targetMonth)] ?: BalanceCheckResult(10000.0, 0.0, 10000.0)
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
@@ -134,23 +140,23 @@ fun DashboardScreen(
                 MonthlyAssetOverviewCard(
                     currentYear = targetYear,
                     currentMonth = targetMonth,
-                    monthlyOverview = monthlyOverview
+                    monthlyOverview = itemOverview
                 )
             }
 
             // 2. 资金池配平健康状态卡片（对应草稿页）
             item {
-                CapitalBalanceCard(balanceCheckResult = balanceCheckResult)
+                CapitalBalanceCard(balanceCheckResult = itemBalanceCheck)
             }
 
             // 3. 本月收入来源分类概览（看板专属展示）
-            if (monthlyOverview.incomeOverviewList.isNotEmpty()) {
+            if (itemOverview.incomeOverviewList.isNotEmpty()) {
                 item {
                     SectionHeader(
                         title = "本月收入来源",
                         actionSlot = {
                             Text(
-                                text = "共 ${monthlyOverview.incomeOverviewList.size} 类别",
+                                text = "共 ${itemOverview.incomeOverviewList.size} 类别",
                                 fontSize = 12.sp,
                                 color = MiuixTheme.colorScheme.onSurfaceSecondary
                             )
@@ -158,7 +164,7 @@ fun DashboardScreen(
                     )
                 }
 
-                items(monthlyOverview.incomeOverviewList, key = { it.categoryName }) { incomeOverview ->
+                items(itemOverview.incomeOverviewList, key = { it.categoryName }) { incomeOverview ->
                     IncomeEnvelopeCard(
                         incomeOverview = incomeOverview,
                         categoryDefinition = categoryMap[incomeOverview.categoryName]
@@ -172,7 +178,7 @@ fun DashboardScreen(
                     title = "分类支出预算信封",
                     actionSlot = {
                         Text(
-                            text = "共 ${monthlyOverview.categoryOverviewList.size} 大类",
+                            text = "共 ${itemOverview.categoryOverviewList.size} 大类",
                             fontSize = 12.sp,
                             color = MiuixTheme.colorScheme.onSurfaceSecondary
                         )
@@ -181,7 +187,7 @@ fun DashboardScreen(
             }
 
             // 5. 各大类支出信封卡片
-            items(monthlyOverview.categoryOverviewList, key = { it.categoryName }) { categoryOverview ->
+            items(itemOverview.categoryOverviewList, key = { it.categoryName }) { categoryOverview ->
                 BudgetEnvelopeCard(
                     categoryOverview = categoryOverview,
                     categoryDefinition = categoryMap[categoryOverview.categoryName],

@@ -60,6 +60,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _availableMonths = MutableStateFlow<List<Pair<Int, Int>>>(emptyList())
     val availableMonths: StateFlow<List<Pair<Int, Int>>> = _availableMonths.asStateFlow()
 
+    // 全月份数据预载映射（用于 HorizontalPager 滑月时 0 延迟直接秒加载，绝不等待）
+    private val _monthlyOverviewMap = MutableStateFlow<Map<Pair<Int, Int>, MonthlyOverview>>(emptyMap())
+    val monthlyOverviewMap: StateFlow<Map<Pair<Int, Int>, MonthlyOverview>> = _monthlyOverviewMap.asStateFlow()
+
+    private val _budgetItemsMap = MutableStateFlow<Map<Pair<Int, Int>, List<BudgetItem>>>(emptyMap())
+    val budgetItemsMap: StateFlow<Map<Pair<Int, Int>, List<BudgetItem>>> = _budgetItemsMap.asStateFlow()
+
+    private val _transactionsMap = MutableStateFlow<Map<Pair<Int, Int>, List<TransactionRecord>>>(emptyMap())
+    val transactionsMap: StateFlow<Map<Pair<Int, Int>, List<TransactionRecord>>> = _transactionsMap.asStateFlow()
+
+    private val _balanceCheckMap = MutableStateFlow<Map<Pair<Int, Int>, BalanceCheckResult>>(emptyMap())
+    val balanceCheckMap: StateFlow<Map<Pair<Int, Int>, BalanceCheckResult>> = _balanceCheckMap.asStateFlow()
+
     // 月度综合汇总数据（对应综合看板）
     private val _monthlyOverview = MutableStateFlow(MonthlyOverview(2026, 8))
     val monthlyOverview: StateFlow<MonthlyOverview> = _monthlyOverview.asStateFlow()
@@ -110,7 +123,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * 加载当前选定月份的所有业务数据（自动取消前序未完成任务，杜绝过时异步结果回写拉回）。
+     * 加载全量月份的所有业务数据到内存预载映射中（0 延迟直接就绪）。
      */
     fun loadAllData() {
         val targetYear = _currentYear.value
@@ -120,30 +133,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         loadDataJob = viewModelScope.launch(Dispatchers.IO) {
             val categories = repository.getAllCategories()
             val months = repository.getAvailableMonths()
-            val budgetItems = repository.getBudgetItemsByMonth(targetYear, targetMonth)
-            val transactions = repository.getTransactionsByMonth(targetYear, targetMonth)
-            val overview = repository.getMonthlyOverview(targetYear, targetMonth)
-            val balanceCheck = repository.getBalanceCheck(targetYear, targetMonth)
 
-            // 仅当当前活跃的选定年月依然为目标年月时才提交结果，防止快速手势时旧数据覆盖新数据
-            if (_currentYear.value == targetYear && _currentMonth.value == targetMonth) {
-                _allCategories.value = categories
-                _availableMonths.value = months
-                _currentBudgetItems.value = budgetItems
-                _currentTransactions.value = transactions
-                _monthlyOverview.value = overview
-                _balanceCheckResult.value = balanceCheck
+            // 预先批量将所有可用月份的数据加载进映射中
+            val overviews = mutableMapOf<Pair<Int, Int>, MonthlyOverview>()
+            val budgets = mutableMapOf<Pair<Int, Int>, List<BudgetItem>>()
+            val txs = mutableMapOf<Pair<Int, Int>, List<TransactionRecord>>()
+            val balanceChecks = mutableMapOf<Pair<Int, Int>, BalanceCheckResult>()
+
+            for (m in months) {
+                val (y, mo) = m
+                overviews[m] = repository.getMonthlyOverview(y, mo)
+                budgets[m] = repository.getBudgetItemsByMonth(y, mo)
+                txs[m] = repository.getTransactionsByMonth(y, mo)
+                balanceChecks[m] = repository.getBalanceCheck(y, mo)
             }
+
+            _allCategories.value = categories
+            _availableMonths.value = months
+            _monthlyOverviewMap.value = overviews
+            _budgetItemsMap.value = budgets
+            _transactionsMap.value = txs
+            _balanceCheckMap.value = balanceChecks
+
+            val targetKey = Pair(targetYear, targetMonth)
+            _currentBudgetItems.value = budgets[targetKey] ?: emptyList()
+            _currentTransactions.value = txs[targetKey] ?: emptyList()
+            _monthlyOverview.value = overviews[targetKey] ?: MonthlyOverview(targetYear, targetMonth)
+            _balanceCheckResult.value = balanceChecks[targetKey] ?: BalanceCheckResult()
         }
     }
 
     /**
-     * 切换选定的年份与月份。
+     * 切换选定的年份与月份（0 延迟秒切，直接从预载映射中极速读取）。
      */
     fun selectMonth(year: Int, month: Int) {
         _currentYear.value = year
         _currentMonth.value = month
-        loadAllData()
+        val targetKey = Pair(year, month)
+        _monthlyOverviewMap.value[targetKey]?.let { _monthlyOverview.value = it }
+        _budgetItemsMap.value[targetKey]?.let { _currentBudgetItems.value = it }
+        _transactionsMap.value[targetKey]?.let { _currentTransactions.value = it }
+        _balanceCheckMap.value[targetKey]?.let { _balanceCheckResult.value = it }
     }
 
     /**

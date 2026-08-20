@@ -59,42 +59,11 @@ fun TransactionTreeScreen(
     val currentYear by viewModel.currentYear.collectAsState()
     val currentMonth by viewModel.currentMonth.collectAsState()
     val availableMonths by viewModel.availableMonths.collectAsState()
-    val transactionList by viewModel.currentTransactions.collectAsState()
+    val transactionsMap by viewModel.transactionsMap.collectAsState()
 
     var pendingDeleteRecord by remember { mutableStateOf<TransactionRecord?>(null) }
     var showCreateMonthDialog by remember { mutableStateOf(false) }
     var filterType by remember { mutableIntStateOf(0) } // 0: 全部, 1: 仅支出, 2: 仅收入
-
-    // 区分支出与收入
-    val expenseRecords = remember(transactionList) {
-        transactionList.filter { it.amount < 0 }
-    }
-    val incomeRecords = remember(transactionList) {
-        transactionList.filter { it.amount > 0 }
-    }
-    val totalExpense = remember(expenseRecords) {
-        expenseRecords.sumOf { -it.amount }
-    }
-    val totalIncome = remember(incomeRecords) {
-        incomeRecords.sumOf { it.amount }
-    }
-
-    // 根据筛选器过滤
-    val displayedRecords = remember(filterType, transactionList, expenseRecords, incomeRecords) {
-        when (filterType) {
-            1 -> expenseRecords
-            2 -> incomeRecords
-            else -> transactionList
-        }
-    }
-
-    // 按日期（天）降序分组
-    val dayGroupMap = remember(displayedRecords) {
-        displayedRecords.groupBy { it.day }
-    }
-    val sortedDays = remember(dayGroupMap) {
-        dayGroupMap.keys.sortedDescending()
-    }
 
     MonthPagerScaffold(
         availableMonths = availableMonths,
@@ -146,6 +115,40 @@ fun TransactionTreeScreen(
             }
         }
     ) { targetYear, targetMonth ->
+        // 瞬间从全量预载内存缓存中读取当前目标月份的流水列表，0 延迟秒级呈现
+        val monthTransactions = transactionsMap[Pair(targetYear, targetMonth)] ?: emptyList()
+
+        // 区分支出与收入
+        val expenseRecords = remember(monthTransactions) {
+            monthTransactions.filter { it.amount < 0 }
+        }
+        val incomeRecords = remember(monthTransactions) {
+            monthTransactions.filter { it.amount > 0 }
+        }
+        val totalExpense = remember(expenseRecords) {
+            expenseRecords.sumOf { -it.amount }
+        }
+        val totalIncome = remember(incomeRecords) {
+            incomeRecords.sumOf { it.amount }
+        }
+
+        // 根据筛选器过滤
+        val displayedRecords = remember(filterType, monthTransactions, expenseRecords, incomeRecords) {
+            when (filterType) {
+                1 -> expenseRecords
+                2 -> incomeRecords
+                else -> monthTransactions
+            }
+        }
+
+        // 按日期（天）降序分组
+        val dayGroupMap = remember(displayedRecords) {
+            displayedRecords.groupBy { it.day }
+        }
+        val sortedDays = remember(dayGroupMap) {
+            dayGroupMap.keys.sortedDescending()
+        }
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
@@ -184,7 +187,7 @@ fun TransactionTreeScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "全部 (${transactionList.size})",
+                            text = "全部 (${monthTransactions.size})",
                             fontSize = 13.sp,
                             fontWeight = if (filterType == 0) FontWeight.Bold else FontWeight.Normal,
                             color = if (filterType == 0) MiuixTheme.colorScheme.onSurface else MiuixTheme.colorScheme.onSurfaceSecondary

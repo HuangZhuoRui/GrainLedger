@@ -55,24 +55,14 @@ fun BudgetScreen(
     val currentYear by viewModel.currentYear.collectAsState()
     val currentMonth by viewModel.currentMonth.collectAsState()
     val availableMonths by viewModel.availableMonths.collectAsState()
-    val budgetItemList by viewModel.currentBudgetItems.collectAsState()
+    val budgetItemsMap by viewModel.budgetItemsMap.collectAsState()
     val allCategories by viewModel.allCategories.collectAsState()
     val categoryMap = remember(allCategories) { allCategories.associateBy { it.categoryName } }
-
-    // 仅保留支出类预算项
-    val expenseBudgetItems = remember(budgetItemList, categoryMap) {
-        budgetItemList.filter { categoryMap[it.categoryName]?.isIncome != true }
-    }
 
     var editingBudgetItem by remember { mutableStateOf<BudgetItem?>(null) }
     var showEditDialog by remember { mutableStateOf(false) }
     var showCreateMonthDialog by remember { mutableStateOf(false) }
     var showCategoryManagementDialog by remember { mutableStateOf(false) }
-
-    // 按大类对预算项进行分组
-    val categoryGroupMap = remember(expenseBudgetItems) {
-        expenseBudgetItems.groupBy { it.categoryName }
-    }
 
     MonthPagerScaffold(
         availableMonths = availableMonths,
@@ -182,7 +172,16 @@ fun BudgetScreen(
                 )
             }
         }
-    ) { _, _ ->
+    ) { targetYear, targetMonth ->
+        // 瞬间从全量预载内存缓存中读取当前目标月份的预算列表，0 延迟秒级呈现
+        val monthBudgetItems = budgetItemsMap[Pair(targetYear, targetMonth)] ?: emptyList()
+        val expenseBudgetItems = remember(monthBudgetItems, categoryMap) {
+            monthBudgetItems.filter { categoryMap[it.categoryName]?.isIncome != true }
+        }
+        val categoryGroupMap = remember(expenseBudgetItems) {
+            expenseBudgetItems.groupBy { it.categoryName }
+        }
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
