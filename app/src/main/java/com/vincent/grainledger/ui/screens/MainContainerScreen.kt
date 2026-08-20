@@ -18,14 +18,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import com.vincent.grainledger.BuildConfig
 import com.vincent.grainledger.data.model.BudgetItem
 import com.vincent.grainledger.data.updater.UpdateCheckState
+import com.vincent.grainledger.ui.components.layout.AppPageScaffold
 import com.vincent.grainledger.ui.screens.bookkeeping.BookkeepingDialog
 import com.vincent.grainledger.ui.screens.budget.BudgetScreen
 import com.vincent.grainledger.ui.screens.budget.EditBudgetItemDialog
@@ -122,125 +121,118 @@ fun MainContainerScreen(
         }
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize()
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(MiuixTheme.colorScheme.background)
-                .statusBarsPadding()
-        ) {
-            // 页面切换容器（纯左右平移无渐变）
-            AnimatedContent(
-                targetState = selectedTabIndex,
-                transitionSpec = {
-                    if (targetState > initialState) {
-                        slideInHorizontally(
-                            initialOffsetX = { fullWidth -> fullWidth },
+    AppPageScaffold(
+        applyStatusBarPadding = true,
+        applyNavigationBarPadding = false
+    ) {
+        // 页面切换容器（纯左右平移无渐变）
+        AnimatedContent(
+            targetState = selectedTabIndex,
+            transitionSpec = {
+                if (targetState > initialState) {
+                    slideInHorizontally(
+                        initialOffsetX = { fullWidth -> fullWidth },
+                        animationSpec = MiuixAnimation.springSmooth()
+                    ).togetherWith(
+                        slideOutHorizontally(
+                            targetOffsetX = { fullWidth -> -fullWidth },
                             animationSpec = MiuixAnimation.springSmooth()
-                        ).togetherWith(
-                            slideOutHorizontally(
-                                targetOffsetX = { fullWidth -> -fullWidth },
-                                animationSpec = MiuixAnimation.springSmooth()
-                            )
                         )
-                    } else {
-                        slideInHorizontally(
-                            initialOffsetX = { fullWidth -> -fullWidth },
+                    )
+                } else {
+                    slideInHorizontally(
+                        initialOffsetX = { fullWidth -> -fullWidth },
+                        animationSpec = MiuixAnimation.springSmooth()
+                    ).togetherWith(
+                        slideOutHorizontally(
+                            targetOffsetX = { fullWidth -> fullWidth },
                             animationSpec = MiuixAnimation.springSmooth()
-                        ).togetherWith(
-                            slideOutHorizontally(
-                                targetOffsetX = { fullWidth -> fullWidth },
-                                animationSpec = MiuixAnimation.springSmooth()
-                            )
                         )
-                    }
-                },
-                label = "主页签切换",
-                modifier = Modifier.fillMaxSize()
-            ) { index ->
-                when (index) {
-                    0 -> DashboardScreen(
-                        viewModel = viewModel,
-                        onOpenBookkeeping = { showBookkeepingDialog = true },
-                        onBudgetItemClick = { item ->
-                            editingBudgetItem = item
-                            showBudgetEditDialog = true
-                        }
-                    )
-                    1 -> BudgetScreen(
-                        viewModel = viewModel
-                    )
-                    2 -> TransactionTreeScreen(
-                        viewModel = viewModel
-                    )
-                    3 -> SettingsScreen(
-                        viewModel = viewModel,
-                        onNavigateToUpdate = onNavigateToUpdate
                     )
                 }
+            },
+            label = "主页签切换",
+            modifier = Modifier.fillMaxSize()
+        ) { index ->
+            when (index) {
+                0 -> DashboardScreen(
+                    viewModel = viewModel,
+                    onOpenBookkeeping = { showBookkeepingDialog = true },
+                    onBudgetItemClick = { item ->
+                        editingBudgetItem = item
+                        showBudgetEditDialog = true
+                    }
+                )
+                1 -> BudgetScreen(
+                    viewModel = viewModel
+                )
+                2 -> TransactionTreeScreen(
+                    viewModel = viewModel
+                )
+                3 -> SettingsScreen(
+                    viewModel = viewModel,
+                    onNavigateToUpdate = onNavigateToUpdate
+                )
             }
+        }
 
-            // 底部 MIUI 悬浮胶囊导航栏
-            Box(
+        // 底部 MIUI 悬浮胶囊导航栏
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 12.dp)
+        ) {
+            Row(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 12.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .shadow(
-                            elevation = 16.dp,
-                            shape = MiuixShapes.DialogSquircle,
-                            spotColor = Color.Black.copy(alpha = 0.15f)
-                        )
-                        .background(
-                            color = MiuixTheme.colorScheme.surface,
-                            shape = MiuixShapes.DialogSquircle
-                        )
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceAround,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val tabList = listOf(
-                        NavigationTab.Dashboard,
-                        NavigationTab.Budget,
-                        NavigationTab.Transactions,
-                        NavigationTab.Settings
+                    .shadow(
+                        elevation = 16.dp,
+                        shape = MiuixShapes.DialogSquircle,
+                        spotColor = Color.Black.copy(alpha = 0.15f)
                     )
+                    .background(
+                        color = MiuixTheme.colorScheme.surface,
+                        shape = MiuixShapes.DialogSquircle
+                    )
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val tabList = listOf(
+                    NavigationTab.Dashboard,
+                    NavigationTab.Budget,
+                    NavigationTab.Transactions,
+                    NavigationTab.Settings
+                )
 
-                    tabList.forEach { tab ->
-                        val isSelected = (selectedTabIndex == tab.index)
-                        Column(
-                            modifier = Modifier
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    viewModel.setSelectedTabIndex(tab.index)
-                                }
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Icon(
-                                imageVector = tab.icon,
-                                contentDescription = tab.title,
-                                tint = if (isSelected) MiuixBlue else MiuixTheme.colorScheme.onSurfaceSecondary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Text(
-                                text = tab.title,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) MiuixBlue else MiuixTheme.colorScheme.onSurfaceSecondary
-                            )
-                        }
+                tabList.forEach { tab ->
+                    val isSelected = (selectedTabIndex == tab.index)
+                    Column(
+                        modifier = Modifier
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                viewModel.setSelectedTabIndex(tab.index)
+                            }
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Icon(
+                            imageVector = tab.icon,
+                            contentDescription = tab.title,
+                            tint = if (isSelected) MiuixBlue else MiuixTheme.colorScheme.onSurfaceSecondary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Text(
+                            text = tab.title,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MiuixBlue else MiuixTheme.colorScheme.onSurfaceSecondary
+                        )
                     }
                 }
             }

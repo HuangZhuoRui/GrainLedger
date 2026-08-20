@@ -1,9 +1,7 @@
 package com.vincent.grainledger.ui.screens.updater
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -26,8 +24,8 @@ import com.vincent.grainledger.BuildConfig
 import com.vincent.grainledger.data.updater.DownloadStatus
 import com.vincent.grainledger.data.updater.UpdateCheckState
 import com.vincent.grainledger.ui.components.feedback.EmptyStateView
+import com.vincent.grainledger.ui.components.layout.AppPageScaffold
 import com.vincent.grainledger.ui.components.layout.SectionHeader
-import com.vincent.grainledger.ui.components.layout.SubPageHeader
 import com.vincent.grainledger.ui.screens.updater.components.CurrentVersionCard
 import com.vincent.grainledger.ui.screens.updater.components.ReleaseHistoryCard
 import com.vincent.grainledger.ui.theme.MiuixBlue
@@ -37,11 +35,11 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 /**
  * 独立的检查更新与版本发布历史页面 (UpdateScreen)。
  *
- * 遵循单一数据源 (SSOT) 原则，提供应用版本检查、多通道下载（正常下载与加速下载）、
- * 实时下载进度展示与历史发布记录浏览。
+ * 接入通用页面容器 AppPageScaffold，完美适配顶部状态栏沉浸、安全边距与返回导航，
+ * 遵循单一数据源 (SSOT) 原则，提供版本检查、多通道下载与历史发布浏览。
  *
  * @param viewModel 全局视图模型
- * @param onBack 点击返回回调
+ * @param onBack 点击返回上一页回调
  */
 @Composable
 fun UpdateScreen(
@@ -65,26 +63,19 @@ fun UpdateScreen(
         viewModel.fetchReleaseHistory()
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MiuixTheme.colorScheme.background)
+    AppPageScaffold(
+        title = "检查更新",
+        subtitle = "版本状态与更新历史记录",
+        onBack = onBack,
+        applyStatusBarPadding = true,
+        applyNavigationBarPadding = true
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 48.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. 顶部返回与页面标题
-            item {
-                SubPageHeader(
-                    title = "检查更新",
-                    subtitle = "版本状态与更新历史记录",
-                    onBack = onBack
-                )
-            }
-
-            // 2. 当前版本与检查卡片
+            // 1. 当前版本与检查卡片
             item {
                 CurrentVersionCard(
                     currentVersion = currentAppVersion,
@@ -95,7 +86,7 @@ fun UpdateScreen(
                 )
             }
 
-            // 3. 历史版本发布记录分区标题
+            // 2. 历史版本发布记录分区标题
             item {
                 SectionHeader(
                     title = "版本发布历史",
@@ -117,7 +108,7 @@ fun UpdateScreen(
                 )
             }
 
-            // 4. 历史版本列表
+            // 3. 历史版本列表
             if (releaseHistoryList.isEmpty() && !isLoadingHistory) {
                 item {
                     EmptyStateView(
