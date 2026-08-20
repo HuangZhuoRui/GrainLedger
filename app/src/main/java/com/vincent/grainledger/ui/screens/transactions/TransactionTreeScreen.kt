@@ -27,14 +27,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vincent.grainledger.data.model.TransactionRecord
-import com.vincent.grainledger.ui.components.control.MiuixMonthSelector
 import com.vincent.grainledger.ui.components.dialog.ConfirmDialog
 import com.vincent.grainledger.ui.components.feedback.EmptyStateView
-import com.vincent.grainledger.ui.components.layout.PageHeader
+import com.vincent.grainledger.ui.components.layout.MonthPagerScaffold
 import com.vincent.grainledger.ui.screens.budget.CreateMonthDialog
 import com.vincent.grainledger.ui.screens.transactions.components.TransactionDailyCard
 import com.vincent.grainledger.ui.screens.transactions.components.TransactionMonthSummaryCard
-import com.vincent.grainledger.ui.theme.MiuixBlue
 import com.vincent.grainledger.ui.theme.MiuixGreen
 import com.vincent.grainledger.ui.theme.MiuixRed
 import com.vincent.grainledger.ui.theme.MiuixShapes
@@ -45,8 +43,9 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 /**
  * 每日账单与多维层级树状流水页面 (TransactionTreeScreen)。
  *
- * 遵循单一数据源 (SSOT) 原则，全响应式呈现 年 -> 月 -> 日 -> 交易明细 层级，
- * 实时同步展示每一笔消费与入账发生后的【具体剩余】与【类剩余】，支持收支类型智能筛选。
+ * 基于 MonthPagerScaffold 通用脚手架构建：
+ * 顶部展示居中渐变缩放月份进度轴，下方大卡片承载月度收支汇总、
+ * 收支筛选器与每日层级流水树。
  *
  * @param viewModel 全局主视图模型
  * @param modifier 外部修饰符
@@ -96,40 +95,65 @@ fun TransactionTreeScreen(
         dayGroupMap.keys.sortedDescending()
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            // 1. 顶部标题
-            item {
-                PageHeader(
-                    title = "账单流水",
-                    subtitle = "查看每日支出与入账明细及双剩余实时变化"
-                )
-            }
-
-            // 2. 月份选择胶囊
-            item {
-                MiuixMonthSelector(
-                    availableMonthList = availableMonths,
-                    currentYear = currentYear,
-                    currentMonth = currentMonth,
-                    onMonthSelected = { year, month ->
-                        viewModel.selectMonth(year, month)
+    MonthPagerScaffold(
+        availableMonths = availableMonths,
+        currentYear = currentYear,
+        currentMonth = currentMonth,
+        pageTitle = "账单流水",
+        subtitle = "查看每日支出与入账明细及双剩余实时变化",
+        onMonthSelected = { year, month ->
+            viewModel.selectMonth(year, month)
+        },
+        onAddMonthClick = {
+            showCreateMonthDialog = true
+        },
+        dialogs = {
+            // 删除记录二次确认弹窗
+            if (pendingDeleteRecord != null) {
+                val record = pendingDeleteRecord!!
+                val isIncome = record.amount > 0
+                val typeName = if (isIncome) "入账" else "支出"
+                val formattedAmount = if (isIncome) "+¥${MathFormulaEvaluator.formatAmount(record.amount)}" else "-¥${MathFormulaEvaluator.formatAmount(record.absoluteAmount)}"
+                ConfirmDialog(
+                    title = "删除${typeName}记录",
+                    message = "确定要删除【${record.categoryName} - ${record.detailName}】金额 ${formattedAmount} 的这笔${typeName}记录吗？删除后可用结余将自动反算回补。",
+                    onConfirm = {
+                        viewModel.deleteTransaction(record)
+                        pendingDeleteRecord = null
                     },
-                    onAddMonthClick = {
-                        showCreateMonthDialog = true
+                    onDismiss = {
+                        pendingDeleteRecord = null
                     }
                 )
             }
 
-            // 3. 当月收支流水统计卡片
+            // 新建月份账本弹窗
+            if (showCreateMonthDialog) {
+                CreateMonthDialog(
+                    currentYear = currentYear,
+                    currentMonth = currentMonth,
+                    availableMonths = availableMonths,
+                    onCreateMonth = { targetYear, targetMonth, copyBudget ->
+                        viewModel.createMonth(targetYear, targetMonth, copyBudget)
+                        showCreateMonthDialog = false
+                    },
+                    onDismissRequest = {
+                        showCreateMonthDialog = false
+                    }
+                )
+            }
+        }
+    ) { targetYear, targetMonth ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // 1. 当月收支流水统计卡片
             item {
                 TransactionMonthSummaryCard(
-                    year = currentYear,
-                    month = currentMonth,
+                    year = targetYear,
+                    month = targetMonth,
                     totalExpense = totalExpense,
                     totalIncome = totalIncome,
                     expenseCount = expenseRecords.size,
@@ -137,7 +161,7 @@ fun TransactionTreeScreen(
                 )
             }
 
-            // 4. 收支分类切换过滤器
+            // 2. 收支分类切换过滤器
             item {
                 Row(
                     modifier = Modifier
@@ -203,7 +227,7 @@ fun TransactionTreeScreen(
                 }
             }
 
-            // 5. 空状态或流水列表
+            // 3. 空状态或流水列表
             if (sortedDays.isEmpty()) {
                 item {
                     EmptyStateView(
@@ -219,8 +243,8 @@ fun TransactionTreeScreen(
                 items(sortedDays, key = { it }) { day ->
                     val dayRecords = dayGroupMap[day] ?: emptyList()
                     TransactionDailyCard(
-                        year = currentYear,
-                        month = currentMonth,
+                        year = targetYear,
+                        month = targetMonth,
                         day = day,
                         records = dayRecords,
                         onItemClick = { record ->
@@ -230,40 +254,5 @@ fun TransactionTreeScreen(
                 }
             }
         }
-
-        // 删除记录二次确认弹窗
-        if (pendingDeleteRecord != null) {
-            val record = pendingDeleteRecord!!
-            val isIncome = record.amount > 0
-            val typeName = if (isIncome) "入账" else "支出"
-            val formattedAmount = if (isIncome) "+¥${MathFormulaEvaluator.formatAmount(record.amount)}" else "-¥${MathFormulaEvaluator.formatAmount(record.absoluteAmount)}"
-            ConfirmDialog(
-                title = "删除${typeName}记录",
-                message = "确定要删除【${record.categoryName} - ${record.detailName}】金额 ${formattedAmount} 的这笔${typeName}记录吗？删除后细项与大类结余将自动反算回补。",
-                onConfirm = {
-                    viewModel.deleteTransaction(record)
-                    pendingDeleteRecord = null
-                },
-                onDismiss = {
-                    pendingDeleteRecord = null
-                }
-            )
-        }
-    }
-
-    // 新建月份账本弹窗
-    if (showCreateMonthDialog) {
-        CreateMonthDialog(
-            currentYear = currentYear,
-            currentMonth = currentMonth,
-            availableMonths = availableMonths,
-            onCreateMonth = { targetYear, targetMonth, copyBudget ->
-                viewModel.createMonth(targetYear, targetMonth, copyBudget)
-                showCreateMonthDialog = false
-            },
-            onDismissRequest = {
-                showCreateMonthDialog = false
-            }
-        )
     }
 }

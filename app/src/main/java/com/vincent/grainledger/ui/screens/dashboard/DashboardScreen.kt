@@ -30,8 +30,7 @@ import com.vincent.grainledger.data.model.BudgetItem
 import com.vincent.grainledger.ui.components.card.BudgetEnvelopeCard
 import com.vincent.grainledger.ui.components.card.CapitalBalanceCard
 import com.vincent.grainledger.ui.components.card.IncomeEnvelopeCard
-import com.vincent.grainledger.ui.components.control.MiuixMonthSelector
-import com.vincent.grainledger.ui.components.layout.PageHeader
+import com.vincent.grainledger.ui.components.layout.MonthPagerScaffold
 import com.vincent.grainledger.ui.components.layout.SectionHeader
 import com.vincent.grainledger.ui.screens.budget.CreateMonthDialog
 import com.vincent.grainledger.ui.screens.dashboard.components.MonthlyAssetOverviewCard
@@ -43,8 +42,9 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 /**
  * 综合看板主页面 (DashboardScreen)。
  *
- * 遵循单一数据源 (SSOT) 原则，全响应式展示月度核心资产总览卡片（含上月结余滚存）、
- * 月份切换胶囊、资金池配平健康状态卡片、本月收入分类卡片以及各大类支出预算信封列表。
+ * 基于 MonthPagerScaffold 通用脚手架构建：
+ * 顶部展示居中渐变缩放月份进度轴，下方大卡片承载月度核心资产总览、
+ * 资金池配平健康状态、本月收入分类卡片与各支出预算信封列表。
  *
  * @param viewModel 全局主视图模型
  * @param onOpenBookkeeping 触发快速记账弹窗回调
@@ -64,56 +64,84 @@ fun DashboardScreen(
     val monthlyOverview by viewModel.monthlyOverview.collectAsState()
     val balanceCheckResult by viewModel.balanceCheckResult.collectAsState()
     val allCategories by viewModel.allCategories.collectAsState()
-    val categoryMap = allCategories.associateBy { it.categoryName }
+    val categoryMap = remember(allCategories) { allCategories.associateBy { it.categoryName } }
 
     var showCreateMonthDialog by remember { mutableStateOf(false) }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            // 1. 顶部标题栏
-            item {
-                PageHeader(
-                    title = "余粮",
-                    subtitle = "个人预算信封与智能日常记账系统"
-                )
+    MonthPagerScaffold(
+        availableMonths = availableMonths,
+        currentYear = currentYear,
+        currentMonth = currentMonth,
+        pageTitle = "余粮",
+        subtitle = "个人预算信封与智能日常记账系统",
+        onMonthSelected = { year, month ->
+            viewModel.selectMonth(year, month)
+        },
+        onAddMonthClick = {
+            showCreateMonthDialog = true
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onOpenBookkeeping,
+                containerColor = MiuixBlue,
+                contentColor = Color.White,
+                shape = MiuixShapes.MediumSquircle
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "快速记账",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "记一笔",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
-
-            // 2. 月份快速切换条
-            item {
-                MiuixMonthSelector(
-                    availableMonthList = availableMonths,
+        },
+        dialogs = {
+            if (showCreateMonthDialog) {
+                CreateMonthDialog(
                     currentYear = currentYear,
                     currentMonth = currentMonth,
-                    onMonthSelected = { year, month ->
-                        viewModel.selectMonth(year, month)
+                    availableMonths = availableMonths,
+                    onCreateMonth = { targetYear, targetMonth, copyBudget ->
+                        viewModel.createMonth(targetYear, targetMonth, copyBudget)
+                        showCreateMonthDialog = false
                     },
-                    onAddMonthClick = {
-                        showCreateMonthDialog = true
+                    onDismissRequest = {
+                        showCreateMonthDialog = false
                     }
                 )
             }
-
-            // 3. 本月核心资产总览大卡片（含上月结余滚存）
+        }
+    ) { targetYear, targetMonth ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // 1. 本月核心资产总览大卡片（含上月结余滚存）
             item {
                 MonthlyAssetOverviewCard(
-                    currentYear = currentYear,
-                    currentMonth = currentMonth,
+                    currentYear = targetYear,
+                    currentMonth = targetMonth,
                     monthlyOverview = monthlyOverview
                 )
             }
 
-            // 4. 资金池配平健康状态卡片（对应草稿页）
+            // 2. 资金池配平健康状态卡片（对应草稿页）
             item {
-                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    CapitalBalanceCard(balanceCheckResult = balanceCheckResult)
-                }
+                CapitalBalanceCard(balanceCheckResult = balanceCheckResult)
             }
 
-            // 5. 本月收入来源分类概览（看板专属展示）
+            // 3. 本月收入来源分类概览（看板专属展示）
             if (monthlyOverview.incomeOverviewList.isNotEmpty()) {
                 item {
                     SectionHeader(
@@ -129,16 +157,14 @@ fun DashboardScreen(
                 }
 
                 items(monthlyOverview.incomeOverviewList, key = { it.categoryName }) { incomeOverview ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        IncomeEnvelopeCard(
-                            incomeOverview = incomeOverview,
-                            categoryDefinition = categoryMap[incomeOverview.categoryName]
-                        )
-                    }
+                    IncomeEnvelopeCard(
+                        incomeOverview = incomeOverview,
+                        categoryDefinition = categoryMap[incomeOverview.categoryName]
+                    )
                 }
             }
 
-            // 6. 分类支出预算信封列表标题
+            // 4. 分类支出预算信封列表标题
             item {
                 SectionHeader(
                     title = "分类支出预算信封",
@@ -152,60 +178,14 @@ fun DashboardScreen(
                 )
             }
 
-            // 7. 各大类支出信封卡片
+            // 5. 各大类支出信封卡片
             items(monthlyOverview.categoryOverviewList, key = { it.categoryName }) { categoryOverview ->
-                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    BudgetEnvelopeCard(
-                        categoryOverview = categoryOverview,
-                        categoryDefinition = categoryMap[categoryOverview.categoryName],
-                        onBudgetItemClick = onBudgetItemClick
-                    )
-                }
-            }
-        }
-
-        // 悬浮快速记账按钮 (Floating Action Button)
-        FloatingActionButton(
-            onClick = onOpenBookkeeping,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 80.dp, end = 20.dp),
-            containerColor = MiuixBlue,
-            contentColor = Color.White,
-            shape = MiuixShapes.MediumSquircle
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "快速记账",
-                    modifier = Modifier.size(20.dp)
-                )
-                Text(
-                    text = "记一笔",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
+                BudgetEnvelopeCard(
+                    categoryOverview = categoryOverview,
+                    categoryDefinition = categoryMap[categoryOverview.categoryName],
+                    onBudgetItemClick = onBudgetItemClick
                 )
             }
         }
-    }
-
-    // 新建月份账本弹窗
-    if (showCreateMonthDialog) {
-        CreateMonthDialog(
-            currentYear = currentYear,
-            currentMonth = currentMonth,
-            availableMonths = availableMonths,
-            onCreateMonth = { targetYear, targetMonth, copyBudget ->
-                viewModel.createMonth(targetYear, targetMonth, copyBudget)
-                showCreateMonthDialog = false
-            },
-            onDismissRequest = {
-                showCreateMonthDialog = false
-            }
-        )
     }
 }

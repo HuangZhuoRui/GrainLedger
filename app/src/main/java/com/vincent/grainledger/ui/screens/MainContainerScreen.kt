@@ -146,12 +146,12 @@ fun MainContainerScreen(
         applyStatusBarPadding = true,
         applyNavigationBarPadding = false
     ) {
-        // 水平全量多页连续平移容器 (A -> B -> C -> D 完整滑动)
+        // 水平全量多页容器（页面切换完全由 TabBar 接管，禁用手势滑动冲突）
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
             beyondViewportPageCount = 3,
-            userScrollEnabled = true
+            userScrollEnabled = false
         ) { pageIndex ->
             when (pageIndex) {
                 0 -> DashboardScreen(
