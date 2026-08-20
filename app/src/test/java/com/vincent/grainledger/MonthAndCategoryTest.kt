@@ -253,52 +253,64 @@ class MonthAndCategoryTest {
 
     @Test
     fun testRolloverFromPreviousMonth() {
-        // 模拟8月份：基础预算 5000，当月入账 8000，当月消费 3000 -> 8月总结余 = (5000+8000)-3000 = 10000
-        val m8ExpenseAllocated = 5000.0
+        // 严格现金流：8月份入账 8000，当月消费 3000 -> 8月总结余 = 8000 - 3000 = 5000
         val m8Income = 8000.0
         val m8Spent = 3000.0
-        val m8TotalAllocated = m8ExpenseAllocated + m8Income
-        val m8Balance = m8TotalAllocated - m8Spent
-        assertEquals(10000.0, m8Balance, 0.001)
+        val m8Balance = m8Income - m8Spent
+        assertEquals(5000.0, m8Balance, 0.001)
 
-        // 模拟9月份：基础预算 6000，当月入账 0，上月结余滚存 10000
-        val m9ExpenseAllocated = 6000.0
+        // 9月份：入账 0，上月结余滚存 5000 -> 总可用资金 5000，消费 1500 -> 总结余 3500
         val m9Income = 0.0
-        val m9Rollover = m8Balance // 自动结转给9月使用
-        val m9TotalAllocated = m9ExpenseAllocated + m9Income + m9Rollover // 6000 + 0 + 10000 = 16000
+        val m9Rollover = m8Balance
+        val m9TotalFunds = m9Income + m9Rollover // 0 + 5000 = 5000
         val m9Spent = 1500.0
-        val m9Balance = m9TotalAllocated - m9Spent // 16000 - 1500 = 14500
+        val m9Balance = m9TotalFunds - m9Spent // 5000 - 1500 = 3500
 
-        assertEquals(16000.0, m9TotalAllocated, 0.001)
-        assertEquals(14500.0, m9Balance, 0.001)
+        assertEquals(5000.0, m9TotalFunds, 0.001)
+        assertEquals(3500.0, m9Balance, 0.001)
+    }
+
+    @Test
+    fun testStrictZeroIncomeNegativeBalance() {
+        // 场景：某月无任何真实收入入账（0元），无上月滚存，但实际消费支出了 5413.50 元
+        val income = 0.0
+        val rollover = 0.0
+        val spent = 5413.50
+
+        val totalFunds = income + rollover
+        val balance = totalFunds - spent
+
+        assertEquals(0.0, totalFunds, 0.001)
+        assertEquals(-5413.50, balance, 0.001)
+        assertTrue(balance < 0.0) // 严格呈现为赤字负数
     }
 
     @Test
     fun testMultiMonthContinuousChainRollover() {
-        // 模拟多月历史链条 (6月 -> 7月 -> 8月 -> 9月)，验证资金一分不漏全程继承
+        // 模拟多月历史链条 (6月 -> 7月 -> 8月 -> 9月)，验证严格现金流全程继承
         var cumulativeRollover = 0.0
 
-        // 6月：基础预算 5000，入账 8000，消费 3000 -> 期末结余 10000
-        val m6Funds = 5000.0 + 8000.0 + cumulativeRollover
+        // 6月：入账 8000，消费 3000 -> 期末结余 5000
+        val m6Funds = 8000.0 + cumulativeRollover
         val m6Ending = m6Funds - 3000.0
-        assertEquals(10000.0, m6Ending, 0.001)
+        assertEquals(5000.0, m6Ending, 0.001)
         cumulativeRollover = m6Ending
 
-        // 7月：基础预算 2000，入账 0，继承6月滚存 10000 -> 总资金 12000，消费 4000 -> 期末结余 8000
-        val m7Funds = 2000.0 + 0.0 + cumulativeRollover
-        val m7Ending = m7Funds - 4000.0
-        assertEquals(8000.0, m7Ending, 0.001)
+        // 7月：入账 0，继承6月滚存 5000 -> 总资金 5000，消费 6000 -> 期末赤字 -1000
+        val m7Funds = 0.0 + cumulativeRollover
+        val m7Ending = m7Funds - 6000.0
+        assertEquals(-1000.0, m7Ending, 0.001)
         cumulativeRollover = m7Ending
 
-        // 8月：基础预算 3000，入账 1000，继承7月滚存 8000 -> 总资金 12000，消费 2000 -> 期末结余 10000
-        val m8Funds = 3000.0 + 1000.0 + cumulativeRollover
+        // 8月：入账 8000，继承7月赤字 -1000 -> 总资金 7000，消费 2000 -> 期末结余 5000
+        val m8Funds = 8000.0 + cumulativeRollover
         val m8Ending = m8Funds - 2000.0
-        assertEquals(10000.0, m8Ending, 0.001)
+        assertEquals(5000.0, m8Ending, 0.001)
         cumulativeRollover = m8Ending
 
-        // 9月：基础预算 4000，入账 500，继承8月滚存 10000 -> 总资金 14500
-        val m9Funds = 4000.0 + 500.0 + cumulativeRollover
-        assertEquals(14500.0, m9Funds, 0.001)
+        // 9月：入账 500，继承8月滚存 5000 -> 总资金 5500
+        val m9Funds = 500.0 + cumulativeRollover
+        assertEquals(5500.0, m9Funds, 0.001)
     }
 
     @Test

@@ -452,7 +452,7 @@ class LedgerRepository(context: Context) {
         // 3. 支出来自消费总额
         val totalSpent = BigDecimal(expenseBudgetItems.sumOf { it.actualSpent }).setScale(2, RoundingMode.HALF_UP).toDouble()
 
-        // 4. 历史各月链式累加结余滚存（一次性批量聚合，极速完成历史全程链式计算）
+        // 4. 历史各月链式累加结余滚存（严格按真实入账与实际支出计算资金流转）
         val allBudgets = budgetItemDao.getAllBudgetItems()
         val allTxs = transactionDao.getAllTransactions()
 
@@ -468,30 +468,28 @@ class LedgerRepository(context: Context) {
             it.first < year || (it.first == year && it.second < month)
         }
 
-        val budgetGroupMap = allBudgets.groupBy { Pair(it.year, it.month) }
         val txGroupMap = allTxs.groupBy { Pair(it.year, it.month) }
+        val budgetGroupMap = allBudgets.groupBy { Pair(it.year, it.month) }
 
         var cumulativeRollover = 0.0
         for (pMonthKey in priorMonths) {
             val pBudgetItems = budgetGroupMap[pMonthKey] ?: emptyList()
             val pExpenseItems = pBudgetItems.filter { categoryMap[it.categoryName]?.isIncome != true }
-            val pExpenseAllocated = pExpenseItems.sumOf { it.actualAllocated }
             val pTransactions = txGroupMap[pMonthKey] ?: emptyList()
+
             val pIncomeTotal = pTransactions.filter { it.amount > 0 }.sumOf { it.amount }
             val pSpentTotal = pExpenseItems.sumOf { it.actualSpent }
 
-            // 该历史月总资金 = 基础分配 + 真实入账 + 来自更早历史月份的累积滚存
-            val pTotalFunds = pExpenseAllocated + pIncomeTotal + cumulativeRollover
-            // 该历史月期末结余，持续流转继承给下一个历史月份
-            val pEndingBalance = pTotalFunds - pSpentTotal
-            cumulativeRollover = if (pEndingBalance > 0.0) pEndingBalance else 0.0
+            // 严格现金流核算：上期结余 + 当期真实入账 - 当期实际支出
+            val pEndingBalance = pIncomeTotal + cumulativeRollover - pSpentTotal
+            cumulativeRollover = pEndingBalance
         }
 
         val rolloverFromPreviousMonth = BigDecimal(cumulativeRollover).setScale(2, RoundingMode.HALF_UP).toDouble()
 
-        // 当月总资金池总量 = 支出预算基础分配 + 真实入账总额 + 历史全程累计滚存资金
-        val totalActualAllocated = BigDecimal(totalExpenseAllocated + totalIncome + rolloverFromPreviousMonth).setScale(2, RoundingMode.HALF_UP).toDouble()
-        // 当月可用总结余 = 总资金池总量 - 总消费支出
+        // 严格现金流总资金池总量 = 当月真实入账总额 + 历史全程累计滚存结余
+        val totalActualAllocated = BigDecimal(totalIncome + rolloverFromPreviousMonth).setScale(2, RoundingMode.HALF_UP).toDouble()
+        // 当月可用总结余 = 实际总资金 - 当月实际总支出（若无收入入账则严格显示为负数赤字）
         val totalBalance = BigDecimal(totalActualAllocated - totalSpent).setScale(2, RoundingMode.HALF_UP).toDouble()
 
         // 5. 按支出大类聚合信封卡片

@@ -44,7 +44,7 @@ fun MonthlyAssetOverviewCard(
     modifier: Modifier = Modifier
 ) {
     val hasIncome = monthlyOverview.totalIncome > 0.0
-    val hasRollover = monthlyOverview.rolloverFromPreviousMonth > 0.0
+    val hasRollover = monthlyOverview.rolloverFromPreviousMonth != 0.0
 
     MiuixSectionCard(
         modifier = modifier,
@@ -63,9 +63,15 @@ fun MonthlyAssetOverviewCard(
                 color = MiuixTheme.colorScheme.onSurfaceSecondary
             )
 
+            val (badgeText, badgeColor) = when {
+                monthlyOverview.totalBalance > 0.0 -> "资金充盈" to MiuixGreen
+                monthlyOverview.totalBalance < 0.0 -> "资金赤字" to MiuixRed
+                else -> "收支平衡" to MiuixBlue
+            }
+
             StatusBadge(
-                text = if (monthlyOverview.totalBalance >= 0) "资金充盈" else "预算超支",
-                color = if (monthlyOverview.totalBalance >= 0) MiuixGreen else MiuixRed
+                text = badgeText,
+                color = badgeColor
             )
         }
 
@@ -87,18 +93,26 @@ fun MonthlyAssetOverviewCard(
 
         // 上月结余滚存横幅
         if (hasRollover) {
+            val isPositiveRollover = monthlyOverview.rolloverFromPreviousMonth > 0.0
+            val bannerBg = if (isPositiveRollover) MiuixGreen.copy(alpha = 0.12f) else MiuixRed.copy(alpha = 0.12f)
+            val bannerColor = if (isPositiveRollover) MiuixGreen else MiuixRed
+            val bannerText = if (isPositiveRollover)
+                "🌱 含上月结余滚存: +¥${MathFormulaEvaluator.formatAmount(monthlyOverview.rolloverFromPreviousMonth)}（已自动结转至本月资金池）"
+            else
+                "⚠️ 含上月赤字结转: -¥${MathFormulaEvaluator.formatAmount(-monthlyOverview.rolloverFromPreviousMonth)}（已自动结转至本月资金池）"
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MiuixGreen.copy(alpha = 0.12f))
+                    .background(bannerBg)
                     .padding(horizontal = 10.dp, vertical = 5.dp)
             ) {
                 Text(
-                    text = "🌱 含上月结余滚存: +¥${MathFormulaEvaluator.formatAmount(monthlyOverview.rolloverFromPreviousMonth)}（已自动结转至本月资金池）",
+                    text = bannerText,
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Medium,
-                    color = MiuixGreen
+                    color = bannerColor
                 )
             }
         }
