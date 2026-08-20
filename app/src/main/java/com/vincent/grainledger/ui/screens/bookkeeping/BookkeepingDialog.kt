@@ -59,7 +59,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun BookkeepingDialog(
     viewModel: MainViewModel,
-    showDialog: Boolean,
+    showDialog: Boolean = true,
     onDismissRequest: () -> Unit
 ) {
     if (!showDialog) return

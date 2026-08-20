@@ -129,6 +129,7 @@ fun MainContainerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(paddingValues)
                     .background(MiuixTheme.colorScheme.background)
                     .statusBarsPadding()
             ) {
@@ -244,7 +245,6 @@ fun MainContainerScreen(
             if (showBookkeepingDialog) {
                 BookkeepingDialog(
                     viewModel = viewModel,
-                    showDialog = showBookkeepingDialog,
                     onDismissRequest = { showBookkeepingDialog = false }
                 )
             }
