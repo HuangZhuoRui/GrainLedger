@@ -598,33 +598,113 @@ class LedgerRepository(context: Context) {
     }
 
     /**
-     * 仅清空所有交易流水记录，并自动将所有预算细项的已消费金额归零、还原全部可用结余。
+     * 细分清空指定月份和指定类别的交易流水，并自动重新校准受影响月份中所有预算项的实际消费与结余。
+     *
+     * @param targetMonths 指定月份集合，若为 null 则代表全部可用月份
+     * @param targetCategories 指定分类集合，若为 null 则代表全部分类
+     * @return 删除的流水条数
      */
-    suspend fun clearAllTransactions() = withContext(Dispatchers.IO) {
-        database.runInTransaction { db ->
-            transactionDao.clearAllTransactions(db)
-            val allBudgetItems = budgetItemDao.getAllBudgetItems()
-            allBudgetItems.forEach { item ->
-                budgetItemDao.updateSpentAndBalance(
-                    itemId = item.itemId,
-                    actualSpent = 0.0,
-                    balance = item.actualAllocated,
-                    db = db
-                )
+    suspend fun clearTransactionsFiltered(
+        targetMonths: Set<Pair<Int, Int>>? = null,
+        targetCategories: Set<String>? = null
+    ): Int = withContext(Dispatchers.IO) {
+        val affectedCount = database.runInTransaction { db ->
+            val allTxs = transactionDao.getAllTransactions()
+            val toDelete = allTxs.filter { tx ->
+                val monthMatch = targetMonths == null || targetMonths.contains(Pair(tx.year, tx.month))
+                val catMatch = targetCategories == null || targetCategories.contains(tx.categoryName)
+                monthMatch && catMatch
             }
+
+            if (toDelete.isEmpty()) return@runInTransaction 0
+
+            // 1. 删除匹配的交易流水
+            toDelete.forEach { tx ->
+                transactionDao.deleteTransaction(tx.recordId, db)
+            }
+
+            // 2. 重新校准受影响月份的预算项消费与结余
+            val remainingTxs = transactionDao.getAllTransactions()
+            val txMap = remainingTxs.groupBy { Triple(it.year, it.month, Pair(it.categoryName, it.detailName)) }
+
+            val allBudgets = budgetItemDao.getAllBudgetItems()
+            allBudgets.forEach { item ->
+                val key = Triple(item.year, item.month, Pair(item.categoryName, item.detailName))
+                val itemTxs = txMap[key] ?: emptyList()
+                val newSpent = itemTxs.filter { it.amount < 0 }.sumOf { -it.amount }
+                val newBalance = item.actualAllocated - newSpent
+                if (item.actualSpent != newSpent || item.balance != newBalance) {
+                    budgetItemDao.updateSpentAndBalance(item.itemId, newSpent, newBalance, db)
+                }
+            }
+
+            toDelete.size
         }
-        invalidateAllCaches()
-        notifyDataChanged()
+
+        if (affectedCount > 0) {
+            val months = targetMonths ?: getAvailableMonths().toSet()
+            val earliest = months.minWithOrNull(Comparator { a, b ->
+                if (a.first != b.first) a.first.compareTo(b.first) else a.second.compareTo(b.second)
+            })
+            if (earliest != null) {
+                invalidateMonthAndFuture(earliest.first, earliest.second)
+            } else {
+                invalidateAllCaches()
+            }
+            notifyDataChanged()
+        }
+        affectedCount
     }
 
     /**
-     * 仅清空所有月份的预算规划细项，保留分类体系与历史交易流水记录。
+     * 细分清空指定月份和指定类别的预算细项。
+     *
+     * @param targetMonths 指定月份集合，若为 null 则代表全部可用月份
+     * @param targetCategories 指定分类集合，若为 null 则代表全部分类
+     * @return 删除的预算项条数
      */
-    suspend fun clearAllBudgets() = withContext(Dispatchers.IO) {
-        database.runInTransaction { db ->
-            budgetItemDao.clearAllBudgetItems(db)
+    suspend fun clearBudgetsFiltered(
+        targetMonths: Set<Pair<Int, Int>>? = null,
+        targetCategories: Set<String>? = null
+    ): Int = withContext(Dispatchers.IO) {
+        val affectedCount = database.runInTransaction { db ->
+            val allBudgets = budgetItemDao.getAllBudgetItems()
+            val toDelete = allBudgets.filter { item ->
+                val monthMatch = targetMonths == null || targetMonths.contains(Pair(item.year, item.month))
+                val catMatch = targetCategories == null || targetCategories.contains(item.categoryName)
+                monthMatch && catMatch
+            }
+
+            if (toDelete.isEmpty()) return@runInTransaction 0
+
+            toDelete.forEach { item ->
+                budgetItemDao.deleteBudgetItem(item.itemId, db)
+            }
+            toDelete.size
         }
-        invalidateAllCaches()
-        notifyDataChanged()
+
+        if (affectedCount > 0) {
+            val months = targetMonths ?: getAvailableMonths().toSet()
+            val earliest = months.minWithOrNull(Comparator { a, b ->
+                if (a.first != b.first) a.first.compareTo(b.first) else a.second.compareTo(b.second)
+            })
+            if (earliest != null) {
+                invalidateMonthAndFuture(earliest.first, earliest.second)
+            } else {
+                invalidateAllCaches()
+            }
+            notifyDataChanged()
+        }
+        affectedCount
     }
+
+    /**
+     * 全量清空所有交易流水记录的重载方法。
+     */
+    suspend fun clearAllTransactions(): Int = clearTransactionsFiltered(null, null)
+
+    /**
+     * 全量清空所有月份预算规划的重载方法。
+     */
+    suspend fun clearAllBudgets(): Int = clearBudgetsFiltered(null, null)
 }

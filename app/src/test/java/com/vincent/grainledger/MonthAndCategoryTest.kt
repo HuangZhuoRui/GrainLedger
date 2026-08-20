@@ -386,4 +386,33 @@ class MonthAndCategoryTest {
         val isNewDuplicate = existingMonths.contains(newMonth)
         org.junit.Assert.assertFalse(isNewDuplicate)
     }
+
+    @Test
+    fun testMultiDimensionalGranularCleanFilter() {
+        val tx1 = com.vincent.grainledger.data.model.TransactionRecord(1, 2026, 8, 1, "餐饮", "早餐", -15.0, 85.0, 85.0)
+        val tx2 = com.vincent.grainledger.data.model.TransactionRecord(2, 2026, 8, 2, "交通", "地铁", -6.0, 94.0, 94.0)
+        val tx3 = com.vincent.grainledger.data.model.TransactionRecord(3, 2026, 9, 1, "餐饮", "午餐", -30.0, 70.0, 70.0)
+        val tx4 = com.vincent.grainledger.data.model.TransactionRecord(4, 2026, 9, 2, "工资", "薪水", 8000.0, 8000.0, 8000.0)
+
+        val allTxs = listOf(tx1, tx2, tx3, tx4)
+
+        // 场景 1：仅过滤清理 8月份且为 "餐饮" 的流水 -> tx1
+        val targetMonths = setOf(Pair(2026, 8))
+        val targetCategories = setOf("餐饮")
+        val filtered = allTxs.filter { tx ->
+            val monthMatch = targetMonths.contains(Pair(tx.year, tx.month))
+            val catMatch = targetCategories.contains(tx.categoryName)
+            monthMatch && catMatch
+        }
+        assertEquals(1, filtered.size)
+        assertEquals(tx1.recordId, filtered[0].recordId)
+
+        // 场景 2：全部月份，仅清理 "餐饮" 分类 -> tx1, tx3
+        val allMonthsCategoryFilter = allTxs.filter { it.categoryName == "餐饮" }
+        assertEquals(2, allMonthsCategoryFilter.size)
+
+        // 场景 3：仅清理 9月份全部类别 -> tx3, tx4
+        val monthOnlyFilter = allTxs.filter { it.year == 2026 && it.month == 9 }
+        assertEquals(2, monthOnlyFilter.size)
+    }
 }

@@ -53,11 +53,12 @@ fun SettingsScreen(
     val context = LocalContext.current
     val isProcessingFile by viewModel.isProcessingFile.collectAsState()
     val darkModePreference by viewModel.darkModePreference.collectAsState()
+    val availableMonths by viewModel.availableMonths.collectAsState()
     val allCategories by viewModel.allCategories.collectAsState()
 
     var showResetDialog by remember { mutableStateOf(false) }
     var showDataCleanDialog by remember { mutableStateOf(false) }
-    var pendingCleanType by remember { mutableStateOf<com.vincent.grainledger.ui.screens.settings.components.CleanTargetType?>(null) }
+    var pendingCleanAction by remember { mutableStateOf<Any?>(null) }
     var showCategoryManagementDialog by remember { mutableStateOf(false) }
     val currentAppVersion = BuildConfig.VERSION_NAME
 
@@ -226,9 +227,19 @@ fun SettingsScreen(
         // 细分数据清理选择弹窗
         if (showDataCleanDialog) {
             com.vincent.grainledger.ui.screens.settings.components.DataCleanDialog(
-                onConfirmClean = { cleanType ->
+                availableMonths = availableMonths,
+                allCategories = allCategories,
+                onConfirmCleanTransactions = { targetMonths, targetCats ->
                     showDataCleanDialog = false
-                    pendingCleanType = cleanType
+                    pendingCleanAction = Triple("TRANSACTIONS", targetMonths, targetCats)
+                },
+                onConfirmCleanBudgets = { targetMonths, targetCats ->
+                    showDataCleanDialog = false
+                    pendingCleanAction = Triple("BUDGETS", targetMonths, targetCats)
+                },
+                onConfirmCleanAll = {
+                    showDataCleanDialog = false
+                    pendingCleanAction = Triple("ALL", null, null)
                 },
                 onDismissRequest = {
                     showDataCleanDialog = false
@@ -237,34 +248,49 @@ fun SettingsScreen(
         }
 
         // 细分数据清理防误触二次确认弹窗
-        pendingCleanType?.let { cleanType ->
-            val (confirmTitle, confirmMessage) = when (cleanType) {
-                com.vincent.grainledger.ui.screens.settings.components.CleanTargetType.TRANSACTIONS ->
-                    "清空流水记录" to "确定要清空所有月份的交易流水明细吗？\n所有支出与收入记录将被删除，各预算细项的已消费金额将归零并恢复可用结余！"
-                com.vincent.grainledger.ui.screens.settings.components.CleanTargetType.BUDGETS ->
-                    "清空预算规划" to "确定要清空所有月份的预算细项规划吗？\n所有月份的预算分配项将被清空，现有的预算分类与历史流水记录将继续保留！"
-                com.vincent.grainledger.ui.screens.settings.components.CleanTargetType.ALL ->
-                    "彻底清空全部数据" to "确定要彻底清空数据库中所有月份的预算规划、交易流水和自定义分类吗？\n此操作将完全抹除所有记录，恢复为空白账本状态且不可逆！"
+        pendingCleanAction?.let { actionObj ->
+            @Suppress("UNCHECKED_CAST")
+            val action = actionObj as Triple<String, Set<Pair<Int, Int>>?, Set<String>?>
+            val actionType = action.first
+            val targetMonths = action.second
+            val targetCats = action.third
+
+            val monthDesc = if (targetMonths == null) "全部月份" else "${targetMonths.size} 个选定月份"
+            val catDesc = if (targetCats == null) "全部分类" else "${targetCats.size} 个选定分类"
+
+            val (confirmTitle, confirmMessage, confirmColor) = when (actionType) {
+                "TRANSACTIONS" -> Triple(
+                    "清理交易流水",
+                    "确定要清理【$monthDesc × $catDesc】范围内的交易流水吗？\n流水删除后，对应预算项的实际消费将归零并恢复可用结余！",
+                    com.vincent.grainledger.ui.theme.MiuixOrange
+                )
+                "BUDGETS" -> Triple(
+                    "清理预算规划",
+                    "确定要清理【$monthDesc × $catDesc】范围内的预算规划细项吗？\n预算删除后，现有的分类体系与历史流水记录将继续保留！",
+                    com.vincent.grainledger.ui.theme.MiuixPurple
+                )
+                else -> Triple(
+                    "彻底重置全部数据",
+                    "确定要彻底清空数据库中所有月份的预算规划、交易流水和自定义分类吗？\n此操作将完全抹除所有记录，恢复为空白账本状态且不可逆！",
+                    com.vincent.grainledger.ui.theme.MiuixRed
+                )
             }
 
             ConfirmDialog(
                 title = confirmTitle,
                 message = confirmMessage,
                 confirmText = "确认清除",
-                confirmColor = cleanType.themeColor,
+                confirmColor = confirmColor,
                 onConfirm = {
-                    when (cleanType) {
-                        com.vincent.grainledger.ui.screens.settings.components.CleanTargetType.TRANSACTIONS ->
-                            viewModel.clearAllTransactions()
-                        com.vincent.grainledger.ui.screens.settings.components.CleanTargetType.BUDGETS ->
-                            viewModel.clearAllBudgets()
-                        com.vincent.grainledger.ui.screens.settings.components.CleanTargetType.ALL ->
-                            viewModel.clearAllData()
+                    when (actionType) {
+                        "TRANSACTIONS" -> viewModel.clearTransactionsFiltered(targetMonths, targetCats)
+                        "BUDGETS" -> viewModel.clearBudgetsFiltered(targetMonths, targetCats)
+                        "ALL" -> viewModel.clearAllData()
                     }
-                    pendingCleanType = null
+                    pendingCleanAction = null
                 },
                 onDismiss = {
-                    pendingCleanType = null
+                    pendingCleanAction = null
                 }
             )
         }

@@ -261,25 +261,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * 细分清空指定月份与分类的交易流水记录，并恢复受影响预算项的结余。
+     */
+    fun clearTransactionsFiltered(targetMonths: Set<Pair<Int, Int>>?, targetCategories: Set<String>?) {
+        viewModelScope.launch {
+            val count = repository.clearTransactionsFiltered(targetMonths, targetCategories)
+            _toastMessage.value = if (count > 0) "已成功清理 $count 笔交易流水，预算结余已重新校准！" else "未找到符合条件的流水记录"
+            loadAllData()
+        }
+    }
+
+    /**
+     * 细分清空指定月份与分类的预算规划细项。
+     */
+    fun clearBudgetsFiltered(targetMonths: Set<Pair<Int, Int>>?, targetCategories: Set<String>?) {
+        viewModelScope.launch {
+            val count = repository.clearBudgetsFiltered(targetMonths, targetCategories)
+            _toastMessage.value = if (count > 0) "已成功清理 $count 项预算细项！" else "未找到符合条件的预算项"
+            loadAllData()
+        }
+    }
+
+    /**
      * 仅清空所有交易流水记录，并恢复所有预算项未消费结余。
      */
     fun clearAllTransactions() {
-        viewModelScope.launch {
-            repository.clearAllTransactions()
-            _toastMessage.value = "已成功清空所有流水记录，预算结余已恢复！"
-            loadAllData()
-        }
+        clearTransactionsFiltered(null, null)
     }
 
     /**
      * 仅清空所有月份的预算规划细项。
      */
     fun clearAllBudgets() {
-        viewModelScope.launch {
-            repository.clearAllBudgets()
-            _toastMessage.value = "已成功清空所有月份预算规划！"
-            loadAllData()
-        }
+        clearBudgetsFiltered(null, null)
     }
 
     /**
