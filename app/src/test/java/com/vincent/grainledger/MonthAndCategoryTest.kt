@@ -156,4 +156,50 @@ class MonthAndCategoryTest {
         assertEquals(5000.0, totalSpent, 0.001)
         assertEquals(3000.0, totalBalance, 0.001)
     }
+
+    @Test
+    fun testIncomeAndExpenseTransactionDistinction() {
+        val expenseRecord = com.vincent.grainledger.data.model.TransactionRecord(
+            recordId = 1L,
+            year = 2026,
+            month = 8,
+            day = 20,
+            categoryName = "饮食开销",
+            detailName = "午餐外卖",
+            amount = -35.50,
+            itemRemaining = 464.50,
+            categoryRemaining = 1200.0
+        )
+
+        val incomeRecord = com.vincent.grainledger.data.model.TransactionRecord(
+            recordId = 2L,
+            year = 2026,
+            month = 8,
+            day = 20,
+            categoryName = "工资薪金",
+            detailName = "基本工资",
+            amount = 8000.0,
+            itemRemaining = 8000.0,
+            categoryRemaining = 8000.0
+        )
+
+        // 验证支出流水属性
+        assertTrue(expenseRecord.isExpense)
+        assertEquals(35.50, expenseRecord.absoluteAmount, 0.001)
+
+        // 验证收入流水属性
+        org.junit.Assert.assertFalse(incomeRecord.isExpense)
+        assertEquals(8000.0, incomeRecord.amount, 0.001)
+        assertEquals(8000.0, incomeRecord.absoluteAmount, 0.001)
+
+        // 验证收支统计聚合
+        val records = listOf(expenseRecord, incomeRecord)
+        val expenseTotal = records.filter { it.amount < 0 }.sumOf { -it.amount }
+        val incomeTotal = records.filter { it.amount > 0 }.sumOf { it.amount }
+        val netDifference = incomeTotal - expenseTotal
+
+        assertEquals(35.50, expenseTotal, 0.001)
+        assertEquals(8000.0, incomeTotal, 0.001)
+        assertEquals(7964.50, netDifference, 0.001)
+    }
 }

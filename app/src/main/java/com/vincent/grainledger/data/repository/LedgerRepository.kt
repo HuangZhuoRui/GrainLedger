@@ -223,14 +223,22 @@ class LedgerRepository(context: Context) {
                 db
             )
 
-            // 支出金额（负数，例如 -180.59）
+            // 支出金额（负数，例如 -180.59）; 收入金额（正数，例如 3000.0）
             val amountDelta = transaction.amount
-            val spentIncrease = -amountDelta // 扣减支出为增加消费
+            val isIncome = amountDelta > 0
 
             val computedItemRemaining: Double
             if (matchedItem != null) {
-                val newActualSpent = matchedItem.actualSpent + spentIncrease
-                val newBalance = matchedItem.actualAllocated - newActualSpent
+                val newActualSpent = if (isIncome) {
+                    matchedItem.actualSpent
+                } else {
+                    matchedItem.actualSpent + (-amountDelta)
+                }
+                val newBalance = if (isIncome) {
+                    matchedItem.actualAllocated
+                } else {
+                    matchedItem.actualAllocated - newActualSpent
+                }
                 computedItemRemaining = BigDecimal(newBalance).setScale(2, RoundingMode.HALF_UP).toDouble()
 
                 // 更新预算细项已消费与结余
@@ -250,7 +258,11 @@ class LedgerRepository(context: Context) {
 
             val categoryTotalAllocated = categoryItems.sumOf { it.actualAllocated }
             val categoryTotalSpent = categoryItems.sumOf { it.actualSpent }
-            val computedCategoryRemaining = BigDecimal(categoryTotalAllocated - categoryTotalSpent).setScale(2, RoundingMode.HALF_UP).toDouble()
+            val computedCategoryRemaining = if (isIncome) {
+                BigDecimal(categoryTotalAllocated).setScale(2, RoundingMode.HALF_UP).toDouble()
+            } else {
+                BigDecimal(categoryTotalAllocated - categoryTotalSpent).setScale(2, RoundingMode.HALF_UP).toDouble()
+            }
 
             // 3. 写入流水表
             val recordToSave = transaction.copy(
@@ -270,6 +282,7 @@ class LedgerRepository(context: Context) {
         database.runInTransaction { db ->
             val targetRecord = transactionDao.getTransactionById(recordId, db)
             if (targetRecord != null) {
+                val isIncome = targetRecord.amount > 0
                 // 还原预算项
                 val matchedItem = budgetItemDao.findBudgetItem(
                     targetRecord.year,
@@ -279,7 +292,7 @@ class LedgerRepository(context: Context) {
                     db
                 )
 
-                if (matchedItem != null) {
+                if (matchedItem != null && !isIncome) {
                     val restoredSpent = (matchedItem.actualSpent - (-targetRecord.amount)).coerceAtLeast(0.0)
                     val restoredBalance = matchedItem.actualAllocated - restoredSpent
                     budgetItemDao.updateSpentAndBalance(

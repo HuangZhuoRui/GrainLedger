@@ -13,15 +13,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vincent.grainledger.data.model.TransactionRecord
 import com.vincent.grainledger.ui.components.card.MiuixSectionCard
-import com.vincent.grainledger.ui.components.display.AmountText
+import com.vincent.grainledger.ui.theme.MiuixGreen
 import com.vincent.grainledger.ui.theme.MiuixRed
 import com.vincent.grainledger.util.DateUtils
+import com.vincent.grainledger.util.MathFormulaEvaluator
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 每日流水聚合卡片 (TransactionDailyCard)。
  *
- * 将属于同一日期的多笔消费聚合展示，并呈现当天支出小计。
+ * 将属于同一日期的多笔收支聚合展示，并呈现当天支出与入账小计。
  *
  * @param year 当前年份
  * @param month 当前月份
@@ -39,7 +40,8 @@ fun TransactionDailyCard(
     onItemClick: (TransactionRecord) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val dailyTotalSpent = records.sumOf { it.amount }
+    val dayExpense = records.filter { it.amount < 0 }.sumOf { -it.amount }
+    val dayIncome = records.filter { it.amount > 0 }.sumOf { it.amount }
     val dayOfWeek = DateUtils.getWeekDayName(year, month, day)
 
     MiuixSectionCard(
@@ -73,18 +75,26 @@ fun TransactionDailyCard(
                     )
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "支出小计: ",
-                        fontSize = 12.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary
-                    )
-                    AmountText(
-                        amount = -dailyTotalSpent,
-                        fontSize = 13.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MiuixRed
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (dayExpense > 0.0) {
+                        Text(
+                            text = "支出 -¥${MathFormulaEvaluator.formatAmount(dayExpense)}",
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MiuixRed
+                        )
+                    }
+                    if (dayIncome > 0.0) {
+                        Text(
+                            text = "入账 +¥${MathFormulaEvaluator.formatAmount(dayIncome)}",
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MiuixGreen
+                        )
+                    }
                 }
             }
 
