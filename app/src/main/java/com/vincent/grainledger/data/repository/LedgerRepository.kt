@@ -6,6 +6,7 @@ import com.vincent.grainledger.data.model.BalanceCheckResult
 import com.vincent.grainledger.data.model.BudgetCategory
 import com.vincent.grainledger.data.model.BudgetItem
 import com.vincent.grainledger.data.model.CategoryOverview
+import com.vincent.grainledger.data.model.IncomeCategoryOverview
 import com.vincent.grainledger.data.model.MonthlyOverview
 import com.vincent.grainledger.data.model.TransactionRecord
 import kotlinx.coroutines.Dispatchers
@@ -316,26 +317,45 @@ class LedgerRepository(context: Context) {
      */
     suspend fun getMonthlyOverview(year: Int, month: Int): MonthlyOverview = withContext(Dispatchers.IO) {
         val budgetItems = getBudgetItemsByMonth(year, month)
-        val categoryMap = getAllCategories().associateBy { it.categoryName }
+        val allCats = getAllCategories()
+        val categoryMap = allCats.associateBy { it.categoryName }
         val transactions = getTransactionsByMonth(year, month)
 
-        // 仅支出类预算细项
+        // 1. 仅支出类预算细项
         val expenseBudgetItems = budgetItems.filter { categoryMap[it.categoryName]?.isIncome != true }
 
         val totalPlanned = BigDecimal(expenseBudgetItems.sumOf { it.totalPrice }).setScale(2, RoundingMode.HALF_UP).toDouble()
         val totalExpenseAllocated = BigDecimal(expenseBudgetItems.sumOf { it.actualAllocated }).setScale(2, RoundingMode.HALF_UP).toDouble()
 
-        // 收入来自当月流水中的真实入账
-        val totalIncome = BigDecimal(transactions.filter { it.amount > 0 }.sumOf { it.amount }).setScale(2, RoundingMode.HALF_UP).toDouble()
-        // 支出来自消费总额
+        // 2. 收入来自当月流水中的真实入账
+        val incomeTransactions = transactions.filter { it.amount > 0 }
+        val totalIncome = BigDecimal(incomeTransactions.sumOf { it.amount }).setScale(2, RoundingMode.HALF_UP).toDouble()
+
+        // 3. 支出来自消费总额
         val totalSpent = BigDecimal(expenseBudgetItems.sumOf { it.actualSpent }).setScale(2, RoundingMode.HALF_UP).toDouble()
 
-        // 当月总资金池总量 = 支出预算基础分配 + 真实入账总额
-        val totalActualAllocated = BigDecimal(totalExpenseAllocated + totalIncome).setScale(2, RoundingMode.HALF_UP).toDouble()
+        // 4. 上月结余滚存计算（自动结转上月未用完的资金给下月使用）
+        val (prevYear, prevMonth) = if (month == 1) Pair(year - 1, 12) else Pair(year, month - 1)
+        val prevBudgetItems = getBudgetItemsByMonth(prevYear, prevMonth)
+        val prevTransactions = getTransactionsByMonth(prevYear, prevMonth)
+
+        val rolloverFromPreviousMonth: Double = if (prevBudgetItems.isNotEmpty() || prevTransactions.isNotEmpty()) {
+            val prevExpenseItems = prevBudgetItems.filter { categoryMap[it.categoryName]?.isIncome != true }
+            val prevExpenseAllocated = prevExpenseItems.sumOf { it.actualAllocated }
+            val prevIncomeTotal = prevTransactions.filter { it.amount > 0 }.sumOf { it.amount }
+            val prevSpentTotal = prevExpenseItems.sumOf { it.actualSpent }
+            val prevBalance = BigDecimal((prevExpenseAllocated + prevIncomeTotal) - prevSpentTotal).setScale(2, RoundingMode.HALF_UP).toDouble()
+            if (prevBalance > 0.0) prevBalance else 0.0
+        } else {
+            0.0
+        }
+
+        // 当月总资金池总量 = 支出预算基础分配 + 真实入账总额 + 上月结余滚存
+        val totalActualAllocated = BigDecimal(totalExpenseAllocated + totalIncome + rolloverFromPreviousMonth).setScale(2, RoundingMode.HALF_UP).toDouble()
         // 当月可用总结余 = 总资金池总量 - 总消费支出
         val totalBalance = BigDecimal(totalActualAllocated - totalSpent).setScale(2, RoundingMode.HALF_UP).toDouble()
 
-        // 按支出大类聚合信封卡片
+        // 5. 按支出大类聚合信封卡片
         val categoryGroups = expenseBudgetItems.groupBy { it.categoryName }
         val categoryOverviewList = categoryGroups.map { (categoryName, items) ->
             val budgetTotal = BigDecimal(items.sumOf { it.totalPrice }).setScale(2, RoundingMode.HALF_UP).toDouble()
@@ -353,6 +373,20 @@ class LedgerRepository(context: Context) {
             )
         }.sortedBy { categoryMap[it.categoryName]?.sortOrder ?: 99 }
 
+        // 6. 按收入大类聚合入账概览（显示在看板页面）
+        val incomeCategories = allCats.filter { it.isIncome }
+        val incomeGroupMap = incomeTransactions.groupBy { it.categoryName }
+        val incomeOverviewList = incomeCategories.map { cat ->
+            val transList = incomeGroupMap[cat.categoryName] ?: emptyList()
+            val sum = BigDecimal(transList.sumOf { it.amount }).setScale(2, RoundingMode.HALF_UP).toDouble()
+            IncomeCategoryOverview(
+                categoryName = cat.categoryName,
+                totalIncome = sum,
+                transactionCount = transList.size,
+                transactionList = transList
+            )
+        }.sortedBy { categoryMap[it.categoryName]?.sortOrder ?: 99 }
+
         MonthlyOverview(
             year = year,
             month = month,
@@ -361,7 +395,9 @@ class LedgerRepository(context: Context) {
             totalActualSpent = totalSpent,
             totalBalance = totalBalance,
             totalIncome = totalIncome,
-            categoryOverviewList = categoryOverviewList
+            rolloverFromPreviousMonth = rolloverFromPreviousMonth,
+            categoryOverviewList = categoryOverviewList,
+            incomeOverviewList = incomeOverviewList
         )
     }
 

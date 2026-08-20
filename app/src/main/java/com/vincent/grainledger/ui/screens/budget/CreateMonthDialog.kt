@@ -266,7 +266,23 @@ fun CreateMonthDialog(
                     }
                 }
 
-                // 4. 底部操作按钮
+                // 4. 上月结余自动滚存提示
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MiuixShapes.SmallSquircle)
+                        .background(MiuixGreen.copy(alpha = 0.12f))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "🌱 资金智能结转：如果上个月有剩余未用完的结余资金，系统将自动作为【上月结余滚存】计入新月份的总资金池与可用结余供继续使用。",
+                        fontSize = 12.sp,
+                        color = MiuixGreen,
+                        lineHeight = 17.sp
+                    )
+                }
+
+                // 5. 底部操作按钮
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

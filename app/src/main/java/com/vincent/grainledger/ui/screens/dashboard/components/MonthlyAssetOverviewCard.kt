@@ -1,14 +1,18 @@
 package com.vincent.grainledger.ui.screens.dashboard.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -19,12 +23,13 @@ import com.vincent.grainledger.ui.components.display.StatusBadge
 import com.vincent.grainledger.ui.theme.MiuixBlue
 import com.vincent.grainledger.ui.theme.MiuixGreen
 import com.vincent.grainledger.ui.theme.MiuixRed
+import com.vincent.grainledger.util.MathFormulaEvaluator
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 月度核心资产总览大卡片 (MonthlyAssetOverviewCard)。
  *
- * 展示当月剩余可用总结余、资金状态徽章以及规划总价、资金总量（基础注入+入账）、累计入账与已消费的核心指标。
+ * 展示当月剩余可用总结余、资金状态徽章、上月结余滚存提示、规划总价、资金池总量、本月入账与已消费核心指标。
  *
  * @param currentYear 当前年份
  * @param currentMonth 当前月份
@@ -39,6 +44,7 @@ fun MonthlyAssetOverviewCard(
     modifier: Modifier = Modifier
 ) {
     val hasIncome = monthlyOverview.totalIncome > 0.0
+    val hasRollover = monthlyOverview.rolloverFromPreviousMonth > 0.0
 
     MiuixSectionCard(
         modifier = modifier,
@@ -64,7 +70,7 @@ fun MonthlyAssetOverviewCard(
         }
 
         // 剩余可用结余核心大字
-        Column(modifier = Modifier.padding(top = 10.dp, bottom = 12.dp)) {
+        Column(modifier = Modifier.padding(top = 10.dp, bottom = if (hasRollover) 6.dp else 12.dp)) {
             Text(
                 text = "当前剩余可用总结余",
                 fontSize = 12.sp,
@@ -79,9 +85,29 @@ fun MonthlyAssetOverviewCard(
             )
         }
 
+        // 上月结余滚存横幅
+        if (hasRollover) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MiuixGreen.copy(alpha = 0.12f))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Text(
+                    text = "🌱 含上月结余滚存: +¥${MathFormulaEvaluator.formatAmount(monthlyOverview.rolloverFromPreviousMonth)}（已自动结转至本月资金池）",
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixGreen
+                )
+            }
+        }
+
         // 核心指标行
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = if (hasRollover) 8.dp else 0.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {

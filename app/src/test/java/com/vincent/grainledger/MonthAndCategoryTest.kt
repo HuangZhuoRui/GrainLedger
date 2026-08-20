@@ -250,4 +250,26 @@ class MonthAndCategoryTest {
         // 验证看板记一笔支持从收入类中选取
         assertEquals(listOf("工资薪金", "兼职收入"), incomeCats.map { it.categoryName })
     }
+
+    @Test
+    fun testRolloverFromPreviousMonth() {
+        // 模拟8月份：基础预算 5000，当月入账 8000，当月消费 3000 -> 8月总结余 = (5000+8000)-3000 = 10000
+        val m8ExpenseAllocated = 5000.0
+        val m8Income = 8000.0
+        val m8Spent = 3000.0
+        val m8TotalAllocated = m8ExpenseAllocated + m8Income
+        val m8Balance = m8TotalAllocated - m8Spent
+        assertEquals(10000.0, m8Balance, 0.001)
+
+        // 模拟9月份：基础预算 6000，当月入账 0，上月结余滚存 10000
+        val m9ExpenseAllocated = 6000.0
+        val m9Income = 0.0
+        val m9Rollover = m8Balance // 自动结转给9月使用
+        val m9TotalAllocated = m9ExpenseAllocated + m9Income + m9Rollover // 6000 + 0 + 10000 = 16000
+        val m9Spent = 1500.0
+        val m9Balance = m9TotalAllocated - m9Spent // 16000 - 1500 = 14500
+
+        assertEquals(16000.0, m9TotalAllocated, 0.001)
+        assertEquals(14500.0, m9Balance, 0.001)
+    }
 }

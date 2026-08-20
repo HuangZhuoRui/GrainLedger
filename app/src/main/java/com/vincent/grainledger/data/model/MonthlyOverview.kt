@@ -4,17 +4,19 @@ package com.vincent.grainledger.data.model
  * 月度综合统计汇总数据模型。
  *
  * 对应 Excel 表格中的《综合查看》及看板核心指标：
- * 包含当月总规划预算（总价￥）、总实际加入资金（实际加入￥）、总实际消费、总结余、
- * 收入类总额，以及各大类的汇总对比数据。
+ * 包含当月总规划预算（总价￥）、资金池总量（实际加入￥ + 收入入账 + 上月结余滚存）、总实际消费、总结余、
+ * 收入类总额、上月结余滚存，以及各大类（支出信封与收入来源）的汇总数据。
  *
  * @property year 目标年份
  * @property month 目标月份 (1-12)
- * @property totalPlannedBudget 该月所有预算项总价之和（例如 10054.60）
- * @property totalActualAllocated 该月总资金量（基础预算注入 + 收入类金额）
- * @property totalActualSpent 该月所有支出流水之和（例如 6013.50）
- * @property totalBalance 资金池总剩余（totalActualAllocated - totalActualSpent）
- * @property totalIncome 当月收入类分类金额总和
- * @property categoryOverviewList 各大类的聚合统计列表
+ * @property totalPlannedBudget 该月所有支出预算项总价之和
+ * @property totalActualAllocated 该月总资金池总量（基础预算注入 + 实际入账 + 上月滚存）
+ * @property totalActualSpent 该月所有支出流水之和
+ * @property totalBalance 资金池可用总结余（totalActualAllocated - totalActualSpent）
+ * @property totalIncome 当月实际入账总和
+ * @property rolloverFromPreviousMonth 上月剩余资金滚存结转额度
+ * @property categoryOverviewList 各支出大类的聚合统计列表
+ * @property incomeOverviewList 各收入大类的入账聚合统计列表
  */
 data class MonthlyOverview(
     val year: Int,
@@ -24,11 +26,13 @@ data class MonthlyOverview(
     val totalActualSpent: Double = 0.0,
     val totalBalance: Double = totalActualAllocated - totalActualSpent,
     val totalIncome: Double = 0.0,
-    val categoryOverviewList: List<CategoryOverview> = emptyList()
+    val rolloverFromPreviousMonth: Double = 0.0,
+    val categoryOverviewList: List<CategoryOverview> = emptyList(),
+    val incomeOverviewList: List<IncomeCategoryOverview> = emptyList()
 )
 
 /**
- * 单个分类在特定月份下的聚合统计模型。
+ * 单个支出分类在特定月份下的聚合统计模型。
  *
  * @property categoryName 分类名称（例如 "强制类"）
  * @property categoryTotalBudget 该分类下的预算总额
@@ -56,6 +60,21 @@ data class CategoryOverview(
             return (categoryActualSpent / categoryActualAllocated).toFloat().coerceIn(0.0f, 2.0f)
         }
 }
+
+/**
+ * 单个收入分类在特定月份下的聚合统计模型。
+ *
+ * @property categoryName 收入大类名称（例如 "工资薪金"）
+ * @property totalIncome 该分类当月累计入账总额
+ * @property transactionCount 该分类当月入账笔数
+ * @property transactionList 该分类当月的具体入账记录列表
+ */
+data class IncomeCategoryOverview(
+    val categoryName: String,
+    val totalIncome: Double = 0.0,
+    val transactionCount: Int = 0,
+    val transactionList: List<TransactionRecord> = emptyList()
+)
 
 /**
  * 资金池配平健康状态检查结果模型。
