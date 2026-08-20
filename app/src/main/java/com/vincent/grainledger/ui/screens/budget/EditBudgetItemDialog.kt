@@ -137,7 +137,7 @@ fun EditBudgetItemDialog(
                             .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
                         Text(
-                            text = "💡 本项归属于【收入类】：保存后该金额将作为新增资金直接累加至当月资金池（总量）与可用结余中。",
+                            text = "💡 收入项无需预设上限：后续在看板中每“记一笔收入”，入账金额都将动态累加至该细项，并直接增加当月资金池（总量）与可用总结余。",
                             fontSize = 12.sp,
                             color = MiuixGreen,
                             lineHeight = 17.sp
@@ -224,7 +224,7 @@ fun EditBudgetItemDialog(
                         onValueChange = { unitPriceInput = it },
                         label = {
                             Text(
-                                text = if (isIncome) "预计收入 (支持如 3000+500)" else "单价/基准额 (支持如 30+50)"
+                                text = if (isIncome) "预估收入参考 (选填，支持如 3000+500)" else "单价/基准额 (支持如 30+50)"
                             )
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -255,7 +255,7 @@ fun EditBudgetItemDialog(
                     label = {
                         Text(
                             text = if (isIncome) {
-                                "实际到账额度 (留空默认等同于预计收入，累加至总量)"
+                                "初始已入账金额 (选填，后续每“记一笔收入”将自动动态累加)"
                             } else {
                                 "实际加入额度 (资金注入，留空默认等同于总价预算)"
                             }

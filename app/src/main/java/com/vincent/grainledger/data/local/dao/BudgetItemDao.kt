@@ -174,6 +174,45 @@ class BudgetItemDao(private val database: GrainLedgerDatabase) {
     }
 
     /**
+     * 更新收入项的实际入账金额与结余。
+     */
+    fun updateAllocatedAndBalance(itemId: Long, actualAllocated: Double, balance: Double, db: SQLiteDatabase? = null): Int {
+        val targetDb = db ?: database.writableDatabase
+        val values = ContentValues().apply {
+            put(GrainLedgerDatabase.COL_BUDGET_ACTUAL_ALLOCATED, actualAllocated)
+            put(GrainLedgerDatabase.COL_BUDGET_BALANCE, balance)
+        }
+        return targetDb.update(
+            GrainLedgerDatabase.TABLE_BUDGET_ITEMS,
+            values,
+            "${GrainLedgerDatabase.COL_BUDGET_ID} = ?",
+            arrayOf(itemId.toString())
+        )
+    }
+
+    /**
+     * 插入新的预算细项。
+     */
+    fun insertBudgetItem(item: BudgetItem, db: SQLiteDatabase? = null): Long {
+        val targetDb = db ?: database.writableDatabase
+        val values = ContentValues().apply {
+            put(GrainLedgerDatabase.COL_BUDGET_YEAR, item.year)
+            put(GrainLedgerDatabase.COL_BUDGET_MONTH, item.month)
+            put(GrainLedgerDatabase.COL_BUDGET_CATEGORY, item.categoryName)
+            put(GrainLedgerDatabase.COL_BUDGET_ITEM_NAME, item.detailName)
+            put(GrainLedgerDatabase.COL_BUDGET_UNIT_PRICE, item.unitPrice)
+            put(GrainLedgerDatabase.COL_BUDGET_QUANTITY, item.quantity)
+            put(GrainLedgerDatabase.COL_BUDGET_TOTAL_PRICE, item.totalPrice)
+            put(GrainLedgerDatabase.COL_BUDGET_ACTUAL_ALLOCATED, item.actualAllocated)
+            put(GrainLedgerDatabase.COL_BUDGET_FUNDER, item.funder)
+            put(GrainLedgerDatabase.COL_BUDGET_ACTUAL_SPENT, item.actualSpent)
+            put(GrainLedgerDatabase.COL_BUDGET_BALANCE, item.balance)
+            put(GrainLedgerDatabase.COL_BUDGET_REMARK, item.remark)
+        }
+        return targetDb.insert(GrainLedgerDatabase.TABLE_BUDGET_ITEMS, null, values)
+    }
+
+    /**
      * 根据主键删除预算项。
      */
     fun deleteBudgetItem(itemId: Long, db: SQLiteDatabase? = null): Int {

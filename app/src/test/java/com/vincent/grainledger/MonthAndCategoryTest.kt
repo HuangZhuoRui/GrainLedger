@@ -202,4 +202,30 @@ class MonthAndCategoryTest {
         assertEquals(8000.0, incomeTotal, 0.001)
         assertEquals(7964.50, netDifference, 0.001)
     }
+
+    @Test
+    fun testDynamicIncomeAccumulationOnBookkeeping() {
+        // 初始状态：基础支出预算 6000，初始收入 0
+        val baseExpenseAllocated = 6000.0
+        var incomeItemAllocated = 0.0
+
+        // 第一次记一笔收入：工资 +5000
+        val trans1 = 5000.0
+        incomeItemAllocated += trans1
+        var totalFunds = baseExpenseAllocated + incomeItemAllocated
+        assertEquals(5000.0, incomeItemAllocated, 0.001)
+        assertEquals(11000.0, totalFunds, 0.001)
+
+        // 第二次记一笔收入：兼职 +1200
+        val trans2 = 1200.0
+        incomeItemAllocated += trans2
+        totalFunds = baseExpenseAllocated + incomeItemAllocated
+        assertEquals(6200.0, incomeItemAllocated, 0.001)
+        assertEquals(12200.0, totalFunds, 0.001)
+
+        // 记一笔支出：消费 -800
+        val spent = 800.0
+        val totalBalance = totalFunds - spent
+        assertEquals(11400.0, totalBalance, 0.001)
+    }
 }

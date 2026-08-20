@@ -214,7 +214,7 @@ class LedgerRepository(context: Context) {
      */
     suspend fun recordTransaction(transaction: TransactionRecord): Long = withContext(Dispatchers.IO) {
         database.runInTransaction { db ->
-            // 1. 查找对应的预算项
+            // 1. 查找对应的预算/收入项
             val matchedItem = budgetItemDao.findBudgetItem(
                 transaction.year,
                 transaction.month,
@@ -228,31 +228,58 @@ class LedgerRepository(context: Context) {
             val isIncome = amountDelta > 0
 
             val computedItemRemaining: Double
-            if (matchedItem != null) {
-                val newActualSpent = if (isIncome) {
-                    matchedItem.actualSpent
-                } else {
-                    matchedItem.actualSpent + (-amountDelta)
-                }
-                val newBalance = if (isIncome) {
-                    matchedItem.actualAllocated
-                } else {
-                    matchedItem.actualAllocated - newActualSpent
-                }
-                computedItemRemaining = BigDecimal(newBalance).setScale(2, RoundingMode.HALF_UP).toDouble()
+            if (isIncome) {
+                // 收入入账：收入无需预设硬上限，在“记一笔”发生时直接动态累加到该细项与总资金池
+                val currentAllocated = matchedItem?.actualAllocated ?: 0.0
+                val newAllocated = BigDecimal(currentAllocated + amountDelta).setScale(2, RoundingMode.HALF_UP).toDouble()
+                computedItemRemaining = newAllocated
 
-                // 更新预算细项已消费与结余
-                budgetItemDao.updateSpentAndBalance(
-                    itemId = matchedItem.itemId,
-                    actualSpent = newActualSpent,
-                    balance = newBalance,
-                    db = db
-                )
+                if (matchedItem != null) {
+                    budgetItemDao.updateAllocatedAndBalance(
+                        itemId = matchedItem.itemId,
+                        actualAllocated = newAllocated,
+                        balance = newAllocated,
+                        db = db
+                    )
+                } else {
+                    // 若尚未预先建立该收入条目，自动根据记账流水生成对应的收入细项
+                    val newItem = BudgetItem(
+                        itemId = 0L,
+                        year = transaction.year,
+                        month = transaction.month,
+                        categoryName = transaction.categoryName,
+                        detailName = transaction.detailName,
+                        unitPrice = amountDelta,
+                        quantity = 1.0,
+                        totalPrice = amountDelta,
+                        actualAllocated = newAllocated,
+                        funder = transaction.funder,
+                        actualSpent = 0.0,
+                        balance = newAllocated,
+                        remark = transaction.remark
+                    )
+                    budgetItemDao.insertBudgetItem(newItem, db)
+                }
             } else {
-                computedItemRemaining = 0.0
+                // 支出记账：增加已消费，扣减结余
+                val spentIncrease = -amountDelta
+                if (matchedItem != null) {
+                    val newActualSpent = matchedItem.actualSpent + spentIncrease
+                    val newBalance = matchedItem.actualAllocated - newActualSpent
+                    computedItemRemaining = BigDecimal(newBalance).setScale(2, RoundingMode.HALF_UP).toDouble()
+
+                    budgetItemDao.updateSpentAndBalance(
+                        itemId = matchedItem.itemId,
+                        actualSpent = newActualSpent,
+                        balance = newBalance,
+                        db = db
+                    )
+                } else {
+                    computedItemRemaining = 0.0
+                }
             }
 
-            // 2. 计算大类剩余（该大类当前所有实际加入 - 该大类当前所有消费）
+            // 2. 计算大类剩余/总额
             val categoryItems = budgetItemDao.getBudgetItemsByMonth(transaction.year, transaction.month)
                 .filter { it.categoryName == transaction.categoryName }
 
@@ -283,7 +310,6 @@ class LedgerRepository(context: Context) {
             val targetRecord = transactionDao.getTransactionById(recordId, db)
             if (targetRecord != null) {
                 val isIncome = targetRecord.amount > 0
-                // 还原预算项
                 val matchedItem = budgetItemDao.findBudgetItem(
                     targetRecord.year,
                     targetRecord.month,
@@ -292,15 +318,27 @@ class LedgerRepository(context: Context) {
                     db
                 )
 
-                if (matchedItem != null && !isIncome) {
-                    val restoredSpent = (matchedItem.actualSpent - (-targetRecord.amount)).coerceAtLeast(0.0)
-                    val restoredBalance = matchedItem.actualAllocated - restoredSpent
-                    budgetItemDao.updateSpentAndBalance(
-                        itemId = matchedItem.itemId,
-                        actualSpent = restoredSpent,
-                        balance = restoredBalance,
-                        db = db
-                    )
+                if (matchedItem != null) {
+                    if (isIncome) {
+                        // 收入流水删除：回退扣减该收入项的累加入账金额
+                        val restoredAllocated = BigDecimal(matchedItem.actualAllocated - targetRecord.amount).setScale(2, RoundingMode.HALF_UP).toDouble().coerceAtLeast(0.0)
+                        budgetItemDao.updateAllocatedAndBalance(
+                            itemId = matchedItem.itemId,
+                            actualAllocated = restoredAllocated,
+                            balance = restoredAllocated,
+                            db = db
+                        )
+                    } else {
+                        // 支出流水删除：回退扣减已消费金额，恢复可用结余
+                        val restoredSpent = (matchedItem.actualSpent - (-targetRecord.amount)).coerceAtLeast(0.0)
+                        val restoredBalance = matchedItem.actualAllocated - restoredSpent
+                        budgetItemDao.updateSpentAndBalance(
+                            itemId = matchedItem.itemId,
+                            actualSpent = restoredSpent,
+                            balance = restoredBalance,
+                            db = db
+                        )
+                    }
                 }
 
                 // 删除流水
