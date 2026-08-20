@@ -261,6 +261,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * 仅清空所有交易流水记录，并恢复所有预算项未消费结余。
+     */
+    fun clearAllTransactions() {
+        viewModelScope.launch {
+            repository.clearAllTransactions()
+            _toastMessage.value = "已成功清空所有流水记录，预算结余已恢复！"
+            loadAllData()
+        }
+    }
+
+    /**
+     * 仅清空所有月份的预算规划细项。
+     */
+    fun clearAllBudgets() {
+        viewModelScope.launch {
+            repository.clearAllBudgets()
+            _toastMessage.value = "已成功清空所有月份预算规划！"
+            loadAllData()
+        }
+    }
+
+    /**
      * 新建月份账本，并支持一键从当前月份复制预算结构。
      */
     fun createMonth(targetYear: Int, targetMonth: Int, copyFromCurrent: Boolean) {

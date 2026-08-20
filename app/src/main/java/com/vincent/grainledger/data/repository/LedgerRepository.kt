@@ -590,4 +590,35 @@ class LedgerRepository(context: Context) {
         invalidateAllCaches()
         notifyDataChanged()
     }
+
+    /**
+     * 仅清空所有交易流水记录，并自动将所有预算细项的已消费金额归零、还原全部可用结余。
+     */
+    suspend fun clearAllTransactions() = withContext(Dispatchers.IO) {
+        database.runInTransaction { db ->
+            transactionDao.clearAllTransactions(db)
+            val allBudgetItems = budgetItemDao.getAllBudgetItems()
+            allBudgetItems.forEach { item ->
+                budgetItemDao.updateSpentAndBalance(
+                    itemId = item.itemId,
+                    actualSpent = 0.0,
+                    balance = item.actualAllocated,
+                    db = db
+                )
+            }
+        }
+        invalidateAllCaches()
+        notifyDataChanged()
+    }
+
+    /**
+     * 仅清空所有月份的预算规划细项，保留分类体系与历史交易流水记录。
+     */
+    suspend fun clearAllBudgets() = withContext(Dispatchers.IO) {
+        database.runInTransaction { db ->
+            budgetItemDao.clearAllBudgetItems(db)
+        }
+        invalidateAllCaches()
+        notifyDataChanged()
+    }
 }

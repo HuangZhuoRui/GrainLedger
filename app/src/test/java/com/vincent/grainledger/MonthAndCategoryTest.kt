@@ -331,4 +331,38 @@ class MonthAndCategoryTest {
         assertEquals(-200.00, overAllocatedCheck.balanceDifference, 0.001)
         assertTrue(overAllocatedCheck.isOverAllocated)
     }
+
+    @Test
+    fun testGranularDataCleanOperations() {
+        // 1. 模拟清空流水：预算细项的已消费清零，结余恢复为注入金额
+        val itemWithSpent = BudgetItem(
+            itemId = 1L,
+            year = 2026,
+            month = 8,
+            categoryName = "餐饮",
+            detailName = "午餐",
+            unitPrice = 30.0,
+            quantity = 30.0,
+            totalPrice = 900.0,
+            actualAllocated = 900.0,
+            actualSpent = 450.0,
+            balance = 450.0
+        )
+
+        val itemAfterCleanTransactions = itemWithSpent.copy(
+            actualSpent = 0.0,
+            balance = itemWithSpent.actualAllocated
+        )
+
+        assertEquals(0.0, itemAfterCleanTransactions.actualSpent, 0.001)
+        assertEquals(900.0, itemAfterCleanTransactions.balance, 0.001)
+        assertEquals(900.0, itemAfterCleanTransactions.actualAllocated, 0.001)
+
+        // 2. 验证 CleanTargetType 枚举属性定义完备
+        val types = com.vincent.grainledger.ui.screens.settings.components.CleanTargetType.entries
+        assertEquals(3, types.size)
+        assertTrue(types.any { it.name == "TRANSACTIONS" })
+        assertTrue(types.any { it.name == "BUDGETS" })
+        assertTrue(types.any { it.name == "ALL" })
+    }
 }

@@ -56,7 +56,8 @@ fun SettingsScreen(
     val allCategories by viewModel.allCategories.collectAsState()
 
     var showResetDialog by remember { mutableStateOf(false) }
-    var showClearAllDataDialog by remember { mutableStateOf(false) }
+    var showDataCleanDialog by remember { mutableStateOf(false) }
+    var pendingCleanType by remember { mutableStateOf<com.vincent.grainledger.ui.screens.settings.components.CleanTargetType?>(null) }
     var showCategoryManagementDialog by remember { mutableStateOf(false) }
     val currentAppVersion = BuildConfig.VERSION_NAME
 
@@ -174,8 +175,8 @@ fun SettingsScreen(
                     onResetClick = {
                         showResetDialog = true
                     },
-                    onClearAllDataClick = {
-                        showClearAllDataDialog = true
+                    onCleanDataClick = {
+                        showDataCleanDialog = true
                     }
                 )
             }
@@ -222,18 +223,48 @@ fun SettingsScreen(
             )
         }
 
-        // 清除所有数据二次确认弹窗
-        if (showClearAllDataDialog) {
+        // 细分数据清理选择弹窗
+        if (showDataCleanDialog) {
+            com.vincent.grainledger.ui.screens.settings.components.DataCleanDialog(
+                onConfirmClean = { cleanType ->
+                    showDataCleanDialog = false
+                    pendingCleanType = cleanType
+                },
+                onDismissRequest = {
+                    showDataCleanDialog = false
+                }
+            )
+        }
+
+        // 细分数据清理防误触二次确认弹窗
+        pendingCleanType?.let { cleanType ->
+            val (confirmTitle, confirmMessage) = when (cleanType) {
+                com.vincent.grainledger.ui.screens.settings.components.CleanTargetType.TRANSACTIONS ->
+                    "清空流水记录" to "确定要清空所有月份的交易流水明细吗？\n所有支出与收入记录将被删除，各预算细项的已消费金额将归零并恢复可用结余！"
+                com.vincent.grainledger.ui.screens.settings.components.CleanTargetType.BUDGETS ->
+                    "清空预算规划" to "确定要清空所有月份的预算细项规划吗？\n所有月份的预算分配项将被清空，现有的预算分类与历史流水记录将继续保留！"
+                com.vincent.grainledger.ui.screens.settings.components.CleanTargetType.ALL ->
+                    "彻底清空全部数据" to "确定要彻底清空数据库中所有月份的预算规划、交易流水和自定义分类吗？\n此操作将完全抹除所有记录，恢复为空白账本状态且不可逆！"
+            }
+
             ConfirmDialog(
-                title = "清除所有数据",
-                message = "确定要彻底清空数据库中所有月份的预算规划、记账流水和自定义数据吗？此操作将完全抹除所有记录，恢复为空白账本状态且不可逆！",
+                title = confirmTitle,
+                message = confirmMessage,
                 confirmText = "确认清除",
+                confirmColor = cleanType.themeColor,
                 onConfirm = {
-                    viewModel.clearAllData()
-                    showClearAllDataDialog = false
+                    when (cleanType) {
+                        com.vincent.grainledger.ui.screens.settings.components.CleanTargetType.TRANSACTIONS ->
+                            viewModel.clearAllTransactions()
+                        com.vincent.grainledger.ui.screens.settings.components.CleanTargetType.BUDGETS ->
+                            viewModel.clearAllBudgets()
+                        com.vincent.grainledger.ui.screens.settings.components.CleanTargetType.ALL ->
+                            viewModel.clearAllData()
+                    }
+                    pendingCleanType = null
                 },
                 onDismiss = {
-                    showClearAllDataDialog = false
+                    pendingCleanType = null
                 }
             )
         }
