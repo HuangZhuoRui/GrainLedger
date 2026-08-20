@@ -1,0 +1,88 @@
+package com.vincent.grainledger.data.model
+
+/**
+ * 月度综合统计汇总数据模型。
+ *
+ * 对应 Excel 表格中的《综合查看》及看板核心指标：
+ * 包含当月总规划预算（总价￥）、总实际加入资金（实际加入￥）、总实际消费、总结余、
+ * 以及各大类的汇总对比数据。
+ *
+ * @property year 目标年份
+ * @property month 目标月份 (1-12)
+ * @property totalPlannedBudget 该月所有预算项总价之和（例如 10054.60）
+ * @property totalActualAllocated 该月所有注入资金之和（例如 10000.00）
+ * @property totalActualSpent 该月所有支出流水之和（例如 6013.50）
+ * @property totalBalance 资金池总剩余（totalActualAllocated - totalActualSpent）
+ * @property categoryOverviewList 各大类的聚合统计列表
+ */
+data class MonthlyOverview(
+    val year: Int,
+    val month: Int,
+    val totalPlannedBudget: Double = 0.0,
+    val totalActualAllocated: Double = 0.0,
+    val totalActualSpent: Double = 0.0,
+    val totalBalance: Double = totalActualAllocated - totalActualSpent,
+    val categoryOverviewList: List<CategoryOverview> = emptyList()
+)
+
+/**
+ * 单个分类在特定月份下的聚合统计模型。
+ *
+ * @property categoryName 分类名称（例如 "强制类"）
+ * @property categoryTotalBudget 该分类下的预算总额
+ * @property categoryActualAllocated 该分类实际注入资金
+ * @property categoryActualSpent 该分类实际已消费金额
+ * @property categoryBalance 该分类剩余金额
+ * @property budgetItemList 该分类包含的具体预算细项列表
+ */
+data class CategoryOverview(
+    val categoryName: String,
+    val categoryTotalBudget: Double = 0.0,
+    val categoryActualAllocated: Double = 0.0,
+    val categoryActualSpent: Double = 0.0,
+    val categoryBalance: Double = categoryActualAllocated - categoryActualSpent,
+    val budgetItemList: List<BudgetItem> = emptyList()
+) {
+    /**
+     * 获取分类消费占比（占分类实际加入的百分比）。
+     */
+    val usageRatio: Float
+        get() {
+            if (categoryActualAllocated <= 0.0) return if (categoryActualSpent > 0.0) 1.0f else 0.0f
+            return (categoryActualSpent / categoryActualAllocated).toFloat().coerceIn(0.0f, 2.0f)
+        }
+}
+
+/**
+ * 资金池配平健康状态检查结果模型。
+ *
+ * 对应 Excel 表格中的《草稿页》配平公式：`总启动金 - SUM(实际加入) = 0`。
+ * 用于检测分配的资金是否超额或尚有未分配额度。
+ *
+ * @property targetBenchmarkFund 例如设定的启动资金（如 10000.00）
+ * @property allocatedTotalFund 已在预算项中实际加入的金额之和
+ * @property balanceDifference targetBenchmarkFund - allocatedTotalFund（等于 0 代表完美配平）
+ */
+data class BalanceCheckResult(
+    val targetBenchmarkFund: Double = 10000.0,
+    val allocatedTotalFund: Double = 0.0,
+    val balanceDifference: Double = targetBenchmarkFund - allocatedTotalFund
+) {
+    /**
+     * 是否正好完全配平（差额在 0.01 元以内）。
+     */
+    val isBalanced: Boolean
+        get() = kotlin.math.abs(balanceDifference) < 0.01
+
+    /**
+     * 是否超额分配。
+     */
+    val isOverAllocated: Boolean
+        get() = balanceDifference < -0.01
+
+    /**
+     * 是否还有剩余未分配资金。
+     */
+    val hasUnallocatedFund: Boolean
+        get() = balanceDifference > 0.01
+}
