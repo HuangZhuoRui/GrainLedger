@@ -66,6 +66,59 @@ class BudgetItemDao(private val database: GrainLedgerDatabase) {
     }
 
     /**
+     * 一次性获取全量预算项（用于高性能内存聚合与链式滚存计算）。
+     */
+    fun getAllBudgetItems(): List<BudgetItem> {
+        val resultList = mutableListOf<BudgetItem>()
+        val db = database.readableDatabase
+        val cursor = db.query(
+            GrainLedgerDatabase.TABLE_BUDGET_ITEMS,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "${GrainLedgerDatabase.COL_BUDGET_YEAR} ASC, ${GrainLedgerDatabase.COL_BUDGET_MONTH} ASC, ${GrainLedgerDatabase.COL_BUDGET_ID} ASC"
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                val id = it.getLong(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_BUDGET_ID))
+                val itemYear = it.getInt(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_BUDGET_YEAR))
+                val itemMonth = it.getInt(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_BUDGET_MONTH))
+                val categoryName = it.getString(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_BUDGET_CATEGORY))
+                val itemName = it.getString(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_BUDGET_ITEM_NAME))
+                val unitPrice = it.getDouble(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_BUDGET_UNIT_PRICE))
+                val quantity = it.getDouble(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_BUDGET_QUANTITY))
+                val totalPrice = it.getDouble(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_BUDGET_TOTAL_PRICE))
+                val actualAllocated = it.getDouble(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_BUDGET_ACTUAL_ALLOCATED))
+                val funder = it.getString(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_BUDGET_FUNDER))
+                val actualSpent = it.getDouble(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_BUDGET_ACTUAL_SPENT))
+                val balance = it.getDouble(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_BUDGET_BALANCE))
+                val remark = it.getString(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_BUDGET_REMARK))
+
+                resultList.add(
+                    BudgetItem(
+                        itemId = id,
+                        year = itemYear,
+                        month = itemMonth,
+                        categoryName = categoryName,
+                        detailName = itemName,
+                        unitPrice = unitPrice,
+                        quantity = quantity,
+                        totalPrice = totalPrice,
+                        actualAllocated = actualAllocated,
+                        funder = funder,
+                        actualSpent = actualSpent,
+                        balance = balance,
+                        remark = remark
+                    )
+                )
+            }
+        }
+        return resultList
+    }
+
+    /**
      * 获取所有可用的年份与月份列表。
      */
     fun getAvailableMonths(): List<Pair<Int, Int>> {

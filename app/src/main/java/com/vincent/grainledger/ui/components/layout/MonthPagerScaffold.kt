@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
@@ -221,6 +222,7 @@ fun MonthPagerScaffold(
                 Row(
                     modifier = Modifier
                         .fillMaxHeight()
+                        .wrapContentWidth(align = Alignment.Start, unbounded = true)
                         .graphicsLayer {
                             this.translationX = translationXPx
                         },

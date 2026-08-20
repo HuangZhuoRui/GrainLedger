@@ -64,6 +64,57 @@ class TransactionDao(private val database: GrainLedgerDatabase) {
     }
 
     /**
+     * 一次性获取全量流水记录（用于高性能内存聚合与链式滚存计算）。
+     */
+    fun getAllTransactions(): List<TransactionRecord> {
+        val resultList = mutableListOf<TransactionRecord>()
+        val db = database.readableDatabase
+        val cursor = db.query(
+            GrainLedgerDatabase.TABLE_TRANSACTIONS,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "${GrainLedgerDatabase.COL_TRANS_YEAR} ASC, ${GrainLedgerDatabase.COL_TRANS_MONTH} ASC, ${GrainLedgerDatabase.COL_TRANS_DAY} ASC, ${GrainLedgerDatabase.COL_TRANS_ID} ASC"
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                val id = it.getLong(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_TRANS_ID))
+                val transYear = it.getInt(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_TRANS_YEAR))
+                val transMonth = it.getInt(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_TRANS_MONTH))
+                val transDay = it.getInt(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_TRANS_DAY))
+                val categoryName = it.getString(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_TRANS_CATEGORY))
+                val itemDetail = it.getString(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_TRANS_ITEM_DETAIL))
+                val amount = it.getDouble(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_TRANS_AMOUNT))
+                val itemRemaining = it.getDouble(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_TRANS_ITEM_REMAINING))
+                val categoryRemaining = it.getDouble(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_TRANS_CATEGORY_REMAINING))
+                val funder = it.getString(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_TRANS_FUNDER))
+                val remark = it.getString(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_TRANS_REMARK))
+                val timestamp = it.getLong(it.getColumnIndexOrThrow(GrainLedgerDatabase.COL_TRANS_TIMESTAMP))
+
+                resultList.add(
+                    TransactionRecord(
+                        recordId = id,
+                        year = transYear,
+                        month = transMonth,
+                        day = transDay,
+                        categoryName = categoryName,
+                        detailName = itemDetail,
+                        amount = amount,
+                        itemRemaining = itemRemaining,
+                        categoryRemaining = categoryRemaining,
+                        funder = funder,
+                        remark = remark,
+                        timestamp = timestamp
+                    )
+                )
+            }
+        }
+        return resultList
+    }
+
+    /**
      * 获取全部流水记录中包含的年份与月份列表。
      */
     fun getAvailableMonths(): List<Pair<Int, Int>> {

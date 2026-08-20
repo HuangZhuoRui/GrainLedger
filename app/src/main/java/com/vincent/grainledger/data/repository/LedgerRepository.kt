@@ -334,8 +334,13 @@ class LedgerRepository(context: Context) {
         // 3. 支出来自消费总额
         val totalSpent = BigDecimal(expenseBudgetItems.sumOf { it.actualSpent }).setScale(2, RoundingMode.HALF_UP).toDouble()
 
-        // 4. 历史各月链式累加结余滚存（无论跨越多少个月，所有历史剩余未用完的资金全程持续继承）
-        val allChronologicalMonths = (budgetItemDao.getAvailableMonths() + transactionDao.getAvailableMonths())
+        // 4. 历史各月链式累加结余滚存（一次性批量聚合，极速完成历史全程链式计算）
+        val allBudgets = budgetItemDao.getAllBudgetItems()
+        val allTxs = transactionDao.getAllTransactions()
+
+        val budgetMonths = allBudgets.map { Pair(it.year, it.month) }
+        val txMonths = allTxs.map { Pair(it.year, it.month) }
+        val allChronologicalMonths = (budgetMonths + txMonths)
             .distinct()
             .sortedWith(Comparator { a, b ->
                 if (a.first != b.first) a.first.compareTo(b.first) else a.second.compareTo(b.second)
@@ -345,12 +350,15 @@ class LedgerRepository(context: Context) {
             it.first < year || (it.first == year && it.second < month)
         }
 
+        val budgetGroupMap = allBudgets.groupBy { Pair(it.year, it.month) }
+        val txGroupMap = allTxs.groupBy { Pair(it.year, it.month) }
+
         var cumulativeRollover = 0.0
-        for ((pYear, pMonth) in priorMonths) {
-            val pBudgetItems = budgetItemDao.getBudgetItemsByMonth(pYear, pMonth)
+        for (pMonthKey in priorMonths) {
+            val pBudgetItems = budgetGroupMap[pMonthKey] ?: emptyList()
             val pExpenseItems = pBudgetItems.filter { categoryMap[it.categoryName]?.isIncome != true }
             val pExpenseAllocated = pExpenseItems.sumOf { it.actualAllocated }
-            val pTransactions = transactionDao.getTransactionsByMonth(pYear, pMonth)
+            val pTransactions = txGroupMap[pMonthKey] ?: emptyList()
             val pIncomeTotal = pTransactions.filter { it.amount > 0 }.sumOf { it.amount }
             val pSpentTotal = pExpenseItems.sumOf { it.actualSpent }
 

@@ -16,6 +16,8 @@ import com.vincent.grainledger.data.updater.DownloadProgress
 import com.vincent.grainledger.data.updater.DownloadStatus
 import com.vincent.grainledger.data.updater.GitHubRelease
 import com.vincent.grainledger.data.updater.UpdateCheckState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +37,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = LedgerRepository(application)
     private val updaterService = AppUpdaterService()
+
+    // 异步加载任务句柄（防并发重复请求与过时结果回写）
+    private var loadDataJob: Job? = null
 
     // 当前选中的底部导航页签索引（0: 看板, 1: 预算, 2: 流水, 3: 设置）
     private val _selectedTabIndex = MutableStateFlow(0)
@@ -105,19 +110,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * 加载当前选定月份的所有业务数据。
+     * 加载当前选定月份的所有业务数据（自动取消前序未完成任务，杜绝过时异步结果回写拉回）。
      */
     fun loadAllData() {
-        viewModelScope.launch {
-            val year = _currentYear.value
-            val month = _currentMonth.value
+        val targetYear = _currentYear.value
+        val targetMonth = _currentMonth.value
 
-            _allCategories.value = repository.getAllCategories()
-            _availableMonths.value = repository.getAvailableMonths()
-            _currentBudgetItems.value = repository.getBudgetItemsByMonth(year, month)
-            _currentTransactions.value = repository.getTransactionsByMonth(year, month)
-            _monthlyOverview.value = repository.getMonthlyOverview(year, month)
-            _balanceCheckResult.value = repository.getBalanceCheck(year, month)
+        loadDataJob?.cancel()
+        loadDataJob = viewModelScope.launch(Dispatchers.IO) {
+            val categories = repository.getAllCategories()
+            val months = repository.getAvailableMonths()
+            val budgetItems = repository.getBudgetItemsByMonth(targetYear, targetMonth)
+            val transactions = repository.getTransactionsByMonth(targetYear, targetMonth)
+            val overview = repository.getMonthlyOverview(targetYear, targetMonth)
+            val balanceCheck = repository.getBalanceCheck(targetYear, targetMonth)
+
+            // 仅当当前活跃的选定年月依然为目标年月时才提交结果，防止快速手势时旧数据覆盖新数据
+            if (_currentYear.value == targetYear && _currentMonth.value == targetMonth) {
+                _allCategories.value = categories
+                _availableMonths.value = months
+                _currentBudgetItems.value = budgetItems
+                _currentTransactions.value = transactions
+                _monthlyOverview.value = overview
+                _balanceCheckResult.value = balanceCheck
+            }
         }
     }
 
