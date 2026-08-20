@@ -19,6 +19,7 @@ import com.vincent.grainledger.ui.components.control.MiuixMonthSelector
 import com.vincent.grainledger.ui.components.dialog.ConfirmDialog
 import com.vincent.grainledger.ui.components.feedback.EmptyStateView
 import com.vincent.grainledger.ui.components.layout.PageHeader
+import com.vincent.grainledger.ui.screens.budget.CreateMonthDialog
 import com.vincent.grainledger.ui.screens.transactions.components.TransactionDailyCard
 import com.vincent.grainledger.ui.screens.transactions.components.TransactionMonthSummaryCard
 import com.vincent.grainledger.ui.viewmodel.MainViewModel
@@ -43,6 +44,7 @@ fun TransactionTreeScreen(
     val transactionList by viewModel.currentTransactions.collectAsState()
 
     var pendingDeleteRecord by remember { mutableStateOf<TransactionRecord?>(null) }
+    var showCreateMonthDialog by remember { mutableStateOf(false) }
 
     // 按日期（天）降序分组
     val dayGroupMap = remember(transactionList) {
@@ -74,6 +76,9 @@ fun TransactionTreeScreen(
                     currentMonth = currentMonth,
                     onMonthSelected = { year, month ->
                         viewModel.selectMonth(year, month)
+                    },
+                    onAddMonthClick = {
+                        showCreateMonthDialog = true
                     }
                 )
             }
@@ -128,5 +133,21 @@ fun TransactionTreeScreen(
                 }
             )
         }
+    }
+
+    // 新建月份账本弹窗
+    if (showCreateMonthDialog) {
+        CreateMonthDialog(
+            currentYear = currentYear,
+            currentMonth = currentMonth,
+            availableMonths = availableMonths,
+            onCreateMonth = { targetYear, targetMonth, copyBudget ->
+                viewModel.createMonth(targetYear, targetMonth, copyBudget)
+                showCreateMonthDialog = false
+            },
+            onDismissRequest = {
+                showCreateMonthDialog = false
+            }
+        )
     }
 }

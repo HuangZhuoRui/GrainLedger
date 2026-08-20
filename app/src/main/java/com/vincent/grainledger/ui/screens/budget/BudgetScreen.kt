@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,6 +33,7 @@ import com.vincent.grainledger.ui.components.feedback.EmptyStateView
 import com.vincent.grainledger.ui.components.layout.PageHeader
 import com.vincent.grainledger.ui.screens.budget.components.BudgetCategoryGroup
 import com.vincent.grainledger.ui.screens.budget.components.BudgetSummaryCard
+import com.vincent.grainledger.ui.screens.category.CategoryManagementDialog
 import com.vincent.grainledger.ui.theme.MiuixBlue
 import com.vincent.grainledger.ui.theme.MiuixShapes
 import com.vincent.grainledger.ui.viewmodel.MainViewModel
@@ -40,7 +42,7 @@ import com.vincent.grainledger.ui.viewmodel.MainViewModel
  * 预算管理与规划页面 (BudgetScreen)。
  *
  * 遵循单一数据源 (SSOT) 原则，全响应式展示当前月份的预算细项、
- * 按大类聚合分组卡片与统计汇总，支持可视化新增、编辑与删除。
+ * 按大类聚合分组卡片与统计汇总，支持可视化新增月份、大类管理、新增/编辑细项与删除。
  *
  * @param viewModel 全局视图模型
  * @param modifier 外部修饰符
@@ -59,6 +61,8 @@ fun BudgetScreen(
 
     var editingBudgetItem by remember { mutableStateOf<BudgetItem?>(null) }
     var showEditDialog by remember { mutableStateOf(false) }
+    var showCreateMonthDialog by remember { mutableStateOf(false) }
+    var showCategoryManagementDialog by remember { mutableStateOf(false) }
 
     // 按大类对预算项进行分组
     val categoryGroupMap = remember(budgetItemList) {
@@ -71,11 +75,23 @@ fun BudgetScreen(
             contentPadding = PaddingValues(bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 1. 顶部标题
+            // 1. 顶部标题与分类管理入口
             item {
                 PageHeader(
                     title = "预算管理",
-                    subtitle = "规划每月开支细项与资金注入额度"
+                    subtitle = "规划每月开支细项与资金注入额度",
+                    actionSlot = {
+                        TextButton(
+                            onClick = { showCategoryManagementDialog = true }
+                        ) {
+                            Text(
+                                text = "分类管理",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MiuixBlue
+                            )
+                        }
+                    }
                 )
             }
 
@@ -87,6 +103,9 @@ fun BudgetScreen(
                     currentMonth = currentMonth,
                     onMonthSelected = { year, month ->
                         viewModel.selectMonth(year, month)
+                    },
+                    onAddMonthClick = {
+                        showCreateMonthDialog = true
                     }
                 )
             }
@@ -169,6 +188,38 @@ fun BudgetScreen(
             },
             onDismissRequest = {
                 showEditDialog = false
+            }
+        )
+    }
+
+    // 新建月份账本弹窗
+    if (showCreateMonthDialog) {
+        CreateMonthDialog(
+            currentYear = currentYear,
+            currentMonth = currentMonth,
+            availableMonths = availableMonths,
+            onCreateMonth = { targetYear, targetMonth, copyBudget ->
+                viewModel.createMonth(targetYear, targetMonth, copyBudget)
+                showCreateMonthDialog = false
+            },
+            onDismissRequest = {
+                showCreateMonthDialog = false
+            }
+        )
+    }
+
+    // 预算分类全生命周期管理弹窗
+    if (showCategoryManagementDialog) {
+        CategoryManagementDialog(
+            categoryList = allCategories,
+            onSaveCategory = { newCategory, oldName ->
+                viewModel.saveCategory(newCategory, oldName)
+            },
+            onDeleteCategory = { categoryToDelete, deleteAssociated ->
+                viewModel.deleteCategory(categoryToDelete, deleteAssociated)
+            },
+            onDismissRequest = {
+                showCategoryManagementDialog = false
             }
         )
     }

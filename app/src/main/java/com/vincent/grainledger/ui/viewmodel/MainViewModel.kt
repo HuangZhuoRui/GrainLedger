@@ -201,6 +201,58 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * 新建月份账本，并支持一键从当前月份复制预算结构。
+     */
+    fun createMonth(targetYear: Int, targetMonth: Int, copyFromCurrent: Boolean) {
+        viewModelScope.launch {
+            val sourceYear = _currentYear.value
+            val sourceMonth = _currentMonth.value
+            val success = repository.createMonth(
+                targetYear = targetYear,
+                targetMonth = targetMonth,
+                sourceYear = sourceYear,
+                sourceMonth = sourceMonth,
+                copyBudget = copyFromCurrent
+            )
+            if (success) {
+                _currentYear.value = targetYear
+                _currentMonth.value = targetMonth
+                _toastMessage.value = "已成功创建 ${targetYear}年${targetMonth}月 账本！"
+                loadAllData()
+            }
+        }
+    }
+
+    /**
+     * 保存或更新分类。
+     */
+    fun saveCategory(category: BudgetCategory, oldName: String = "") {
+        viewModelScope.launch {
+            repository.saveCategory(category, oldName)
+            _toastMessage.value = if (category.categoryId > 0L) "分类已更新" else "分类创建成功"
+            loadAllData()
+        }
+    }
+
+    /**
+     * 删除指定分类。
+     */
+    fun deleteCategory(category: BudgetCategory, deleteAssociatedItems: Boolean = false) {
+        viewModelScope.launch {
+            repository.deleteCategory(category, deleteAssociatedItems)
+            _toastMessage.value = "分类已删除"
+            loadAllData()
+        }
+    }
+
+    /**
+     * 获取指定分类关联的预算细项数量。
+     */
+    suspend fun getCategoryUsageCount(categoryName: String): Int {
+        return repository.getCategoryUsageCount(categoryName)
+    }
+
+    /**
      * 保存或编辑预算细项。
      */
     fun saveBudgetItem(item: BudgetItem) {

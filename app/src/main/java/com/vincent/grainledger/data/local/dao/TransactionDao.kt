@@ -64,6 +64,28 @@ class TransactionDao(private val database: GrainLedgerDatabase) {
     }
 
     /**
+     * 获取全部流水记录中包含的年份与月份列表。
+     */
+    fun getAvailableMonths(): List<Pair<Int, Int>> {
+        val monthSet = sortedSetOf<Pair<Int, Int>>(Comparator { a, b ->
+            if (a.first != b.first) a.first.compareTo(b.first) else a.second.compareTo(b.second)
+        })
+        val db = database.readableDatabase
+        val cursor = db.rawQuery(
+            "SELECT DISTINCT ${GrainLedgerDatabase.COL_TRANS_YEAR}, ${GrainLedgerDatabase.COL_TRANS_MONTH} FROM ${GrainLedgerDatabase.TABLE_TRANSACTIONS}",
+            null
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                val year = it.getInt(0)
+                val month = it.getInt(1)
+                monthSet.add(Pair(year, month))
+            }
+        }
+        return monthSet.toList()
+    }
+
+    /**
      * 根据主键查询单条流水。
      */
     fun getTransactionById(recordId: Long, db: SQLiteDatabase? = null): TransactionRecord? {

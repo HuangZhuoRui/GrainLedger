@@ -45,6 +45,57 @@ class LedgerRepository(context: Context) {
     }
 
     /**
+     * 保存或更新分类实体。
+     */
+    suspend fun saveCategory(category: BudgetCategory, oldName: String = ""): Long = withContext(Dispatchers.IO) {
+        val resultId = if (category.categoryId > 0L) {
+            categoryDao.updateCategory(oldName, category)
+            category.categoryId
+        } else {
+            categoryDao.insertCategory(category)
+        }
+        notifyDataChanged()
+        resultId
+    }
+
+    /**
+     * 删除指定分类，支持选择是否级联清理该分类下的所有预算细项与流水。
+     */
+    suspend fun deleteCategory(category: BudgetCategory, deleteAssociatedItems: Boolean = false): Boolean = withContext(Dispatchers.IO) {
+        database.runInTransaction { db ->
+            if (deleteAssociatedItems) {
+                db.delete(
+                    GrainLedgerDatabase.TABLE_BUDGET_ITEMS,
+                    "${GrainLedgerDatabase.COL_BUDGET_CATEGORY} = ?",
+                    arrayOf(category.categoryName)
+                )
+                db.delete(
+                    GrainLedgerDatabase.TABLE_TRANSACTIONS,
+                    "${GrainLedgerDatabase.COL_TRANS_CATEGORY} = ?",
+                    arrayOf(category.categoryName)
+                )
+            }
+            categoryDao.deleteCategory(category.categoryId, db)
+        }
+        notifyDataChanged()
+        true
+    }
+
+    /**
+     * 获取指定分类关联的预算细项数量。
+     */
+    suspend fun getCategoryUsageCount(categoryName: String): Int = withContext(Dispatchers.IO) {
+        categoryDao.countBudgetItemsByCategory(categoryName)
+    }
+
+    /**
+     * 获取指定月份的全部记账流水记录（按日期降序排列）。
+     */
+    suspend fun getTransactionsByMonth(year: Int, month: Int): List<TransactionRecord> = withContext(Dispatchers.IO) {
+        transactionDao.getTransactionsByMonth(year, month)
+    }
+
+    /**
      * 获取指定年月的全部预算项列表。
      *
      * @param year 指定年份
@@ -91,19 +142,64 @@ class LedgerRepository(context: Context) {
     }
 
     /**
-     * 获取指定月份的全部记账流水记录（按日期降序排列）。
+     * 新建月份账本，支持从基准月份智能复制克隆预算细项结构。
      */
-    suspend fun getTransactionsByMonth(year: Int, month: Int): List<TransactionRecord> = withContext(Dispatchers.IO) {
-        transactionDao.getTransactionsByMonth(year, month)
+    suspend fun createMonth(
+        targetYear: Int,
+        targetMonth: Int,
+        sourceYear: Int,
+        sourceMonth: Int,
+        copyBudget: Boolean
+    ): Boolean = withContext(Dispatchers.IO) {
+        database.runInTransaction { db ->
+            if (copyBudget) {
+                val sourceItems = budgetItemDao.getBudgetItemsByMonth(sourceYear, sourceMonth)
+                sourceItems.forEach { item ->
+                    val clonedItem = item.copy(
+                        itemId = 0L,
+                        year = targetYear,
+                        month = targetMonth,
+                        actualSpent = 0.0,
+                        balance = item.actualAllocated
+                    )
+                    budgetItemDao.saveBudgetItem(clonedItem, db)
+                }
+            } else {
+                // 若不复制，则为新月份插入一条默认分类的空预算项或直接保留空列表
+                val firstCategory = categoryDao.getAllCategories().firstOrNull()?.categoryName ?: "强制类"
+                val emptyItem = BudgetItem(
+                    itemId = 0L,
+                    year = targetYear,
+                    month = targetMonth,
+                    categoryName = firstCategory,
+                    detailName = "初始预算",
+                    unitPrice = 0.0,
+                    quantity = 1.0,
+                    totalPrice = 0.0,
+                    actualAllocated = 0.0,
+                    funder = "默认账户",
+                    actualSpent = 0.0,
+                    balance = 0.0,
+                    remark = "新建月份初始项"
+                )
+                budgetItemDao.saveBudgetItem(emptyItem, db)
+            }
+        }
+        notifyDataChanged()
+        true
     }
 
     /**
      * 获取所有可用的年份与月份列表。
      */
     suspend fun getAvailableMonths(): List<Pair<Int, Int>> = withContext(Dispatchers.IO) {
-        val months = budgetItemDao.getAvailableMonths()
-        if (months.isNotEmpty()) {
-            months
+        val budgetMonths = budgetItemDao.getAvailableMonths()
+        val txMonths = transactionDao.getAvailableMonths()
+        val combined = (budgetMonths + txMonths).distinct().sortedWith(Comparator { a, b ->
+            if (a.first != b.first) a.first.compareTo(b.first) else a.second.compareTo(b.second)
+        })
+        if (combined.isNotEmpty()) {
+            combined
         } else {
             // 默认若为空则补充 2026 年 8~12 月
             (8..12).map { Pair(2026, it) }

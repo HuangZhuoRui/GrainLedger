@@ -17,6 +17,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,6 +32,7 @@ import com.vincent.grainledger.ui.components.card.CapitalBalanceCard
 import com.vincent.grainledger.ui.components.control.MiuixMonthSelector
 import com.vincent.grainledger.ui.components.layout.PageHeader
 import com.vincent.grainledger.ui.components.layout.SectionHeader
+import com.vincent.grainledger.ui.screens.budget.CreateMonthDialog
 import com.vincent.grainledger.ui.screens.dashboard.components.MonthlyAssetOverviewCard
 import com.vincent.grainledger.ui.theme.MiuixBlue
 import com.vincent.grainledger.ui.theme.MiuixShapes
@@ -61,6 +65,8 @@ fun DashboardScreen(
     val allCategories by viewModel.allCategories.collectAsState()
     val categoryMap = allCategories.associateBy { it.categoryName }
 
+    var showCreateMonthDialog by remember { mutableStateOf(false) }
+
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -83,6 +89,9 @@ fun DashboardScreen(
                     currentMonth = currentMonth,
                     onMonthSelected = { year, month ->
                         viewModel.selectMonth(year, month)
+                    },
+                    onAddMonthClick = {
+                        showCreateMonthDialog = true
                     }
                 )
             }
@@ -156,5 +165,21 @@ fun DashboardScreen(
                 )
             }
         }
+    }
+
+    // 新建月份账本弹窗
+    if (showCreateMonthDialog) {
+        CreateMonthDialog(
+            currentYear = currentYear,
+            currentMonth = currentMonth,
+            availableMonths = availableMonths,
+            onCreateMonth = { targetYear, targetMonth, copyBudget ->
+                viewModel.createMonth(targetYear, targetMonth, copyBudget)
+                showCreateMonthDialog = false
+            },
+            onDismissRequest = {
+                showCreateMonthDialog = false
+            }
+        )
     }
 }
