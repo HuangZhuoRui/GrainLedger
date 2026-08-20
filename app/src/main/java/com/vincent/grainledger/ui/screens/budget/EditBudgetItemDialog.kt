@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
@@ -20,11 +21,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.vincent.grainledger.data.model.BudgetCategory
 import com.vincent.grainledger.data.model.BudgetItem
 import com.vincent.grainledger.ui.theme.MiuixBlue
@@ -33,7 +37,6 @@ import com.vincent.grainledger.ui.theme.MiuixShapes
 import com.vincent.grainledger.util.MathFormulaEvaluator
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -68,177 +71,200 @@ fun EditBudgetItemDialog(
     var funder by remember { mutableStateOf(targetItem?.funder ?: "默认账户") }
     var remark by remember { mutableStateOf(targetItem?.remark ?: "") }
 
-    OverlayDialog(
-        show = true,
+    Dialog(
         onDismissRequest = onDismissRequest,
-        title = if (targetItem == null) "新增预算项" else "编辑预算项"
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .fillMaxWidth(0.92f)
+                .clip(RoundedCornerShape(24.dp))
+                .background(MiuixTheme.colorScheme.surface)
+                .padding(20.dp)
         ) {
-            // 1. 归属分类选择
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // 顶部标题
                 Text(
-                    text = "归属类别",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    text = if (targetItem == null) "新增预算项" else "编辑预算项",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
                     color = MiuixTheme.colorScheme.onSurface
                 )
+
+                // 1. 归属分类选择
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "归属类别",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MiuixTheme.colorScheme.onSurface
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        categoryList.forEach { category ->
+                            val isSelected = (category.categoryName == selectedCategory)
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        color = if (isSelected) MiuixBlue else MiuixTheme.colorScheme.surfaceVariant,
+                                        shape = MiuixShapes.SmallSquircle
+                                    )
+                                    .clickable {
+                                        selectedCategory = category.categoryName
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = category.categoryName,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) Color.White else MiuixTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 2. 细项名称
+                OutlinedTextField(
+                    value = detailName,
+                    onValueChange = { detailName = it },
+                    label = { Text(text = "预算细项名称 (如 房租、餐饮)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MiuixShapes.MediumSquircle,
+                    singleLine = true
+                )
+
+                // 3. 单价与数量（支持公式算式）
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = unitPriceInput,
+                        onValueChange = { unitPriceInput = it },
+                        label = { Text(text = "单价/基准额 (支持如 30+50)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1.3f),
+                        shape = MiuixShapes.MediumSquircle,
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = quantityInput,
+                        onValueChange = { quantityInput = it },
+                        label = { Text(text = "数量/月数") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(0.7f),
+                        shape = MiuixShapes.MediumSquircle,
+                        singleLine = true
+                    )
+                }
+
+                // 4. 实际加入额度 (注入资金，留空则默认等同于总价)
+                OutlinedTextField(
+                    value = actualAllocatedInput,
+                    onValueChange = { actualAllocatedInput = it },
+                    label = { Text(text = "实际加入额度 (留空则默认为总价预算)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MiuixShapes.MediumSquircle,
+                    singleLine = true
+                )
+
+                // 5. 资金出处 / 账户
+                OutlinedTextField(
+                    value = funder,
+                    onValueChange = { funder = it },
+                    label = { Text(text = "资金出处 / 账户") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MiuixShapes.MediumSquircle,
+                    singleLine = true
+                )
+
+                // 6. 备注说明
+                OutlinedTextField(
+                    value = remark,
+                    onValueChange = { remark = it },
+                    label = { Text(text = "备注说明 (选填)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MiuixShapes.MediumSquircle,
+                    singleLine = true
+                )
+
+                // 7. 底部操作按钮
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    categoryList.forEach { category ->
-                        val isSelected = (category.categoryName == selectedCategory)
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    color = if (isSelected) MiuixBlue else MiuixTheme.colorScheme.surfaceVariant,
-                                    shape = MiuixShapes.SmallSquircle
-                                )
-                                .clickable { selectedCategory = category.categoryName }
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                    if (targetItem != null) {
+                        Button(
+                            onClick = {
+                                onDelete(targetItem.itemId)
+                                onDismissRequest()
+                            },
+                            modifier = Modifier.weight(0.8f),
+                            colors = ButtonDefaults.buttonColors(color = MiuixRed.copy(alpha = 0.15f))
                         ) {
-                            Text(
-                                text = category.categoryName,
-                                fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) Color.White else MiuixTheme.colorScheme.onSurface
-                            )
+                            Text(text = "删除", color = MiuixRed)
                         }
                     }
-                }
-            }
 
-            // 2. 详情名称
-            OutlinedTextField(
-                value = detailName,
-                onValueChange = { detailName = it },
-                label = { Text(text = "预算细项名称 (如日常吃/学费)") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = MiuixShapes.MediumSquircle,
-                singleLine = true
-            )
+                    Button(
+                        onClick = onDismissRequest,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(color = MiuixTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Text(text = "取消", color = MiuixTheme.colorScheme.onSurface)
+                    }
 
-            // 3. 单价与数量（两列排布）
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedTextField(
-                    value = unitPriceInput,
-                    onValueChange = { unitPriceInput = it },
-                    label = { Text(text = "单价/定额") },
-                    placeholder = { Text(text = "如 30 或 30+50") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1.2f),
-                    shape = MiuixShapes.MediumSquircle,
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = quantityInput,
-                    onValueChange = { quantityInput = it },
-                    label = { Text(text = "数量/天数") },
-                    placeholder = { Text(text = "如 30 或 4.2") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(0.8f),
-                    shape = MiuixShapes.MediumSquircle,
-                    singleLine = true
-                )
-            }
-
-            // 4. 实际加入金额（资金分配）
-            OutlinedTextField(
-                value = actualAllocatedInput,
-                onValueChange = { actualAllocatedInput = it },
-                label = { Text(text = "实际加入(注入资金，默认等于总价)") },
-                placeholder = { Text(text = "留空则自动按单价×数量计算") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-                shape = MiuixShapes.MediumSquircle,
-                singleLine = true
-            )
-
-            // 5. 备注说明
-            OutlinedTextField(
-                value = remark,
-                onValueChange = { remark = it },
-                label = { Text(text = "备注说明 (选填)") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = MiuixShapes.MediumSquircle,
-                singleLine = true
-            )
-
-            // 6. 操作按钮栏
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                if (targetItem != null) {
                     Button(
                         onClick = {
-                            onDelete(targetItem.itemId)
-                            onDismissRequest()
+                            val unitPrice = MathFormulaEvaluator.evaluate(unitPriceInput)
+                            val quantity = quantityInput.toDoubleOrNull() ?: 1.0
+                            val totalPrice = unitPrice * quantity
+                            val actualAllocated = if (actualAllocatedInput.isNotEmpty()) {
+                                MathFormulaEvaluator.evaluate(actualAllocatedInput)
+                            } else {
+                                totalPrice
+                            }
+
+                            if (detailName.isNotEmpty()) {
+                                val newItem = BudgetItem(
+                                    itemId = targetItem?.itemId ?: 0L,
+                                    year = year,
+                                    month = month,
+                                    categoryName = selectedCategory,
+                                    detailName = detailName,
+                                    unitPrice = unitPrice,
+                                    quantity = quantity,
+                                    totalPrice = totalPrice,
+                                    actualAllocated = actualAllocated,
+                                    funder = funder,
+                                    actualSpent = targetItem?.actualSpent ?: 0.0,
+                                    balance = actualAllocated - (targetItem?.actualSpent ?: 0.0),
+                                    remark = remark
+                                )
+                                onSave(newItem)
+                                onDismissRequest()
+                            }
                         },
-                        modifier = Modifier.weight(0.8f),
-                        colors = ButtonDefaults.buttonColors(color = MiuixRed.copy(alpha = 0.15f))
+                        modifier = Modifier.weight(1.2f),
+                        colors = ButtonDefaults.buttonColors(color = MiuixBlue)
                     ) {
-                        Text(text = "删除", color = MiuixRed)
+                        Text(text = "保存预算", color = Color.White, fontWeight = FontWeight.Bold)
                     }
-                }
-
-                Button(
-                    onClick = onDismissRequest,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(color = MiuixTheme.colorScheme.surfaceVariant)
-                ) {
-                    Text(text = "取消", color = MiuixTheme.colorScheme.onSurface)
-                }
-
-                Button(
-                    onClick = {
-                        val unitPrice = MathFormulaEvaluator.evaluate(unitPriceInput)
-                        val quantity = quantityInput.toDoubleOrNull() ?: 1.0
-                        val totalPrice = unitPrice * quantity
-                        val actualAllocated = if (actualAllocatedInput.isNotEmpty()) {
-                            MathFormulaEvaluator.evaluate(actualAllocatedInput)
-                        } else {
-                            totalPrice
-                        }
-
-                        if (detailName.isNotEmpty()) {
-                            val newItem = BudgetItem(
-                                itemId = targetItem?.itemId ?: 0L,
-                                year = year,
-                                month = month,
-                                categoryName = selectedCategory,
-                                detailName = detailName,
-                                unitPrice = unitPrice,
-                                quantity = quantity,
-                                totalPrice = totalPrice,
-                                actualAllocated = actualAllocated,
-                                funder = funder,
-                                actualSpent = targetItem?.actualSpent ?: 0.0,
-                                balance = actualAllocated - (targetItem?.actualSpent ?: 0.0),
-                                remark = remark
-                            )
-                            onSave(newItem)
-                            onDismissRequest()
-                        }
-                    },
-                    modifier = Modifier.weight(1.2f),
-                    colors = ButtonDefaults.buttonColors(color = MiuixBlue)
-                ) {
-                    Text(text = "保存预算", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
