@@ -238,7 +238,7 @@ private fun HasUpdateView(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Image(
-                painter = painterResource(id = R.mipmap.ic_launcher),
+                painter = painterResource(id = R.drawable.ic_app_logo),
                 contentDescription = "余粮 Logo",
                 modifier = Modifier
                     .size(48.dp)
@@ -434,7 +434,7 @@ private fun AlreadyLatestView(
     ) {
         // 软件官方精致 Logo
         Image(
-            painter = painterResource(id = R.mipmap.ic_launcher),
+            painter = painterResource(id = R.drawable.ic_app_logo),
             contentDescription = "余粮 Logo",
             modifier = Modifier
                 .size(60.dp)

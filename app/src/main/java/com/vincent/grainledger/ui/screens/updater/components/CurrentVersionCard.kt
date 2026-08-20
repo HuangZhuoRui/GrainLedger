@@ -60,9 +60,9 @@ fun CurrentVersionCard(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 软件官方精致 Logo
+            // 软件官方精致 Logo（使用 rasterized drawable 避免 Compose 加载 adaptive-icon 崩溃）
             Image(
-                painter = painterResource(id = R.mipmap.ic_launcher),
+                painter = painterResource(id = R.drawable.ic_app_logo),
                 contentDescription = "余粮 Logo",
                 modifier = Modifier
                     .size(64.dp)
