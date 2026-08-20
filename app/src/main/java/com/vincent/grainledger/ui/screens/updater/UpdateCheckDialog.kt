@@ -1,7 +1,6 @@
 package com.vincent.grainledger.ui.screens.updater
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -34,7 +33,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.OpenInBrowser
-import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -55,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.net.toUri
 import com.vincent.grainledger.data.updater.DownloadProgress
 import com.vincent.grainledger.data.updater.DownloadStatus
 import com.vincent.grainledger.data.updater.GitHubRelease
@@ -147,7 +146,7 @@ fun UpdateCheckDialog(
                                     onCancelDownload = onCancelDownload,
                                     onOpenInBrowser = { url ->
                                         try {
-                                            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                                            val browserIntent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
                                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                             }
                                             context.startActivity(browserIntent)
@@ -218,7 +217,7 @@ private fun CheckingView() {
 @Composable
 private fun HasUpdateView(
     release: GitHubRelease,
-    currentVersion: String,
+    currentVersion: String = "1.0.0",
     acceleratedUrl: String,
     downloadProgress: DownloadProgress,
     onStartDownload: (downloadUrl: String, fileName: String) -> Unit,
@@ -344,14 +343,8 @@ private fun HasUpdateView(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    val currentMb = downloadProgress.receivedBytes.toDouble() / (1024.0 * 1024.0)
-                    val totalMb = downloadProgress.totalBytes.toDouble() / (1024.0 * 1024.0)
                     Text(
-                        text = if (downloadProgress.totalBytes > 0) {
-                            String.format(Locale.getDefault(), "%.1f MB / %.1f MB (%.0f%%)", currentMb, totalMb, downloadProgress.progress * 100)
-                        } else {
-                            String.format(Locale.getDefault(), "%.1f MB", currentMb)
-                        },
+                        text = downloadProgress.formattedSizeProgress,
                         fontSize = 12.sp,
                         color = MiuixTheme.colorScheme.onSurfaceSecondary
                     )
@@ -451,7 +444,7 @@ private fun HasUpdateView(
  */
 @Composable
 private fun AlreadyLatestView(
-    currentVersion: String,
+    currentVersion: String = "1.0.0",
     onDismiss: () -> Unit
 ) {
     Column(

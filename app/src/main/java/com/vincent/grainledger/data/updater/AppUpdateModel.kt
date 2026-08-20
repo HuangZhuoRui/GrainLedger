@@ -177,6 +177,34 @@ data class DownloadProgress(
                 }
             }
         }
+
+    /**
+     * 格式化下载进度与体积（如 "12.5 MB / 28.0 MB (45%)"）。
+     */
+    val formattedSizeProgress: String
+        get() {
+            val currentMb = receivedBytes.toDouble() / (1024.0 * 1024.0)
+            val totalMb = totalBytes.toDouble() / (1024.0 * 1024.0)
+            return if (totalBytes > 0) {
+                String.format(Locale.getDefault(), "%.1f MB / %.1f MB (%.0f%%)", currentMb, totalMb, progress * 100)
+            } else {
+                String.format(Locale.getDefault(), "%.1f MB", currentMb)
+            }
+        }
+
+    /**
+     * 格式化已下载体积与总大小（如 "12.5 MB / 28.0 MB"）。
+     */
+    val formattedDownloadedTotal: String
+        get() {
+            val currentMb = receivedBytes.toDouble() / (1024.0 * 1024.0)
+            val totalMb = totalBytes.toDouble() / (1024.0 * 1024.0)
+            return if (totalBytes > 0) {
+                String.format(Locale.getDefault(), "%.1f MB / %.1f MB", currentMb, totalMb)
+            } else {
+                String.format(Locale.getDefault(), "%.1f MB", currentMb)
+            }
+        }
 }
 
 /**

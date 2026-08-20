@@ -1,10 +1,6 @@
 package com.vincent.grainledger.ui.screens.updater
 
 import android.content.Intent
-import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,7 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -48,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import com.vincent.grainledger.BuildConfig
 import com.vincent.grainledger.data.updater.DownloadProgress
 import com.vincent.grainledger.data.updater.DownloadStatus
@@ -62,7 +58,6 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import java.util.Locale
 
 /**
  * 独立的检查更新与版本发布历史页面 (UpdateScreen)。
@@ -324,7 +319,7 @@ fun UpdateScreen(
                         },
                         onOpenBrowser = { url ->
                             try {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                                val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
                                 context.startActivity(intent)
@@ -364,7 +359,7 @@ fun UpdateScreen(
 @Composable
 private fun ReleaseHistoryCard(
     release: GitHubRelease,
-    currentVersion: String,
+    currentVersion: String = BuildConfig.VERSION_NAME,
     isDownloading: Boolean,
     downloadProgress: DownloadProgress,
     onStartNormalDownload: (directUrl: String, fileName: String) -> Unit,
@@ -535,16 +530,8 @@ private fun ReleaseHistoryCard(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            val downloadedMb = downloadProgress.receivedBytes / (1024.0 * 1024.0)
-                            val totalMb = downloadProgress.totalBytes / (1024.0 * 1024.0)
-                            val sizeText = if (totalMb > 0) {
-                                String.format(Locale.getDefault(), "%.1f MB / %.1f MB", downloadedMb, totalMb)
-                            } else {
-                                String.format(Locale.getDefault(), "%.1f MB", downloadedMb)
-                            }
-
                             Text(
-                                text = sizeText,
+                                text = downloadProgress.formattedDownloadedTotal,
                                 fontSize = 11.5.sp,
                                 color = MiuixTheme.colorScheme.onSurfaceSecondary
                             )

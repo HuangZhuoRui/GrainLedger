@@ -245,9 +245,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * 应用冷启动时静默检查更新（若发现新版本则自动展示弹窗，无更新则保持静默不打扰用户）。
      *
-     * @param currentVersion 当前版本
+     * @param currentVersion 当前版本（默认为 1.0.0）
      */
-    fun checkUpdateOnStartup(currentVersion: String) {
+    fun checkUpdateOnStartup(currentVersion: String = "1.0.0") {
         viewModelScope.launch {
             val hasUpdateState = updaterService.checkUpdateSilently(currentVersion)
             if (hasUpdateState != null) {
@@ -275,9 +275,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * 触发检查应用更新。
      *
-     * @param currentVersion 当前应用版本号
+     * @param currentVersion 当前应用版本号（默认为 1.0.0）
      */
-    fun checkForUpdates(currentVersion: String) {
+    fun checkForUpdates(currentVersion: String = "1.0.0") {
         viewModelScope.launch {
             _updateCheckState.value = UpdateCheckState.Checking
             val resultState = updaterService.checkForUpdate(currentVersion)
