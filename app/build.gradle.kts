@@ -14,24 +14,43 @@ android {
         minSdk = 33
         targetSdk = 37
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    buildTypes {
-        release {
-            optimization {
-                enable = false
+    signingConfigs {
+        create("release") {
+            val customKeystorePath = System.getenv("KEYSTORE_FILE_PATH")
+                ?: (if (file("/Users/vincent/Desktop/SUSE-APP-Key/APP-Key.jks").exists()) "/Users/vincent/Desktop/SUSE-APP-Key/APP-Key.jks" else null)
+
+            if (customKeystorePath != null && file(customKeystorePath).exists()) {
+                storeFile = file(customKeystorePath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "LinuxisUbuntu18"
+                keyAlias = System.getenv("KEY_ALIAS") ?: "suse-app-key"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "LinuxisUbuntu18"
             }
         }
     }
+
+    buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("release")
+        }
+        release {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

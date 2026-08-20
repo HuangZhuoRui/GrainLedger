@@ -10,16 +10,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -31,12 +36,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vincent.grainledger.BuildConfig
+import com.vincent.grainledger.data.updater.UpdateCheckState
+import com.vincent.grainledger.ui.screens.updater.UpdateCheckDialog
 import com.vincent.grainledger.ui.theme.MiuixBlue
 import com.vincent.grainledger.ui.theme.MiuixGreen
 import com.vincent.grainledger.ui.theme.MiuixRed
@@ -49,24 +58,29 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * 设置、主题偏好与 Excel 导入导出管理页面。
+ * 设置、主题偏好、检查更新与 Excel 导入导出管理页面。
  *
  * 提供标准 Excel 文件的双向互通导入导出、重置初始数据、
- * 暗色模式切换与关于信息。
+ * 暗色模式切换、自建高速分发检查更新与关于信息。
  *
  * @param viewModel 全局主视图模型
  */
 @Composable
 fun SettingsScreen(
-    viewModel: MainViewModel,
-    modifier: Modifier = Modifier
+    viewModel: MainViewModel
 ) {
     val context = LocalContext.current
     val isProcessingFile by viewModel.isProcessingFile.collectAsState()
     val darkModePreference by viewModel.darkModePreference.collectAsState()
-    var showResetDialog by remember { mutableStateOf(false) }
+    val updateCheckState by viewModel.updateCheckState.collectAsState()
+    val downloadProgress by viewModel.downloadProgress.collectAsState()
 
-    // 文件选择器（导入 Excel）
+    var showResetDialog by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+
+    val currentAppVersion = BuildConfig.VERSION_NAME
+
+    // Excel 导入文件选择器
     val importFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -76,13 +90,11 @@ fun SettingsScreen(
                 if (inputStream != null) {
                     viewModel.importExcelData(inputStream)
                 }
-            } catch (exception: Exception) {
-                // 异常处理
-            }
+            } catch (_: Exception) {}
         }
     }
 
-    // 文件创建器（导出 Excel）
+    // Excel 导出文件选择器
     val exportFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     ) { uri: Uri? ->
@@ -92,24 +104,22 @@ fun SettingsScreen(
                 if (outputStream != null) {
                     viewModel.exportExcelData(outputStream)
                 }
-            } catch (exception: Exception) {
-                // 异常处理
-            }
+            } catch (_: Exception) {}
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            contentPadding = PaddingValues(top = 16.dp, bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. 标题
+            // 1. 顶部标题栏
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 4.dp)
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
                 ) {
                     Text(
                         text = "设置与数据",
@@ -118,14 +128,46 @@ fun SettingsScreen(
                         color = MiuixTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Excel 互通、主题外观与数据备份管理",
+                        text = "Excel 互通、软件更新、外观与数据备份管理",
                         fontSize = 12.sp,
                         color = MiuixTheme.colorScheme.onSurfaceSecondary
                     )
                 }
             }
 
-            // 2. Excel 导入导出分区
+            // 2. 软件检查更新分区
+            item {
+                Text(
+                    text = "软件更新",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 2.dp)
+                )
+            }
+
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    cornerRadius = 20.dp
+                ) {
+                    SettingItemRow(
+                        icon = Icons.Default.SystemUpdate,
+                        iconBackgroundColor = MiuixBlue,
+                        primaryTitle = "检查应用更新",
+                        secondaryTitle = "当前版本: v$currentAppVersion (自建高速镜像加速分发)",
+                        badgeText = "检查",
+                        onClick = {
+                            showUpdateDialog = true
+                            viewModel.checkForUpdates(currentAppVersion)
+                        }
+                    )
+                }
+            }
+
+            // 3. Excel 导入导出分区
             item {
                 Text(
                     text = "Excel 账单互通",
@@ -163,23 +205,32 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp)
                                 .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .padding(vertical = 0.5.dp)
                         )
 
                         SettingItemRow(
-                            icon = Icons.Default.Share,
+                            icon = Icons.Default.CloudDownload,
                             iconBackgroundColor = MiuixGreen,
-                            primaryTitle = "导出标准 Excel 账单 (.xlsx)",
-                            secondaryTitle = "生成与原 Excel 完全兼容的四表账单",
+                            primaryTitle = "导出为标准 Excel 账单 (.xlsx)",
+                            secondaryTitle = "包含完整综合看板、数据源与每日流水",
                             onClick = {
-                                exportFileLauncher.launch("余粮_账单导出_${System.currentTimeMillis()}.xlsx")
+                                exportFileLauncher.launch("余粮账单_备份_${System.currentTimeMillis()}.xlsx")
                             }
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .padding(vertical = 0.5.dp)
                         )
 
                         SettingItemRow(
                             icon = Icons.Default.Refresh,
                             iconBackgroundColor = MiuixRed,
                             primaryTitle = "恢复初始预置数据",
-                            secondaryTitle = "重新恢复 2026年 8月~12月完整账目数据",
+                            secondaryTitle = "清空现有数据并重置为 2026年 8~12月示例",
                             onClick = {
                                 showResetDialog = true
                             }
@@ -188,7 +239,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 3. 外观与主题模式
+            // 4. 外观与主题模式
             item {
                 Text(
                     text = "界面外观",
@@ -264,7 +315,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 4. 关于应用
+            // 5. 关于应用
             item {
                 Card(
                     modifier = Modifier
@@ -301,7 +352,7 @@ fun SettingsScreen(
                                 color = MiuixTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "基于 MIUIX 规范与非线性物理动效构建 · v1.0.0",
+                                text = "基于 MIUIX 规范与非线性物理动效构建 · v$currentAppVersion",
                                 fontSize = 11.sp,
                                 color = MiuixTheme.colorScheme.onSurfaceSecondary
                             )
@@ -336,6 +387,27 @@ fun SettingsScreen(
         }
     }
 
+    // 检查更新弹窗
+    if (showUpdateDialog && updateCheckState !is UpdateCheckState.Idle) {
+        UpdateCheckDialog(
+            checkState = updateCheckState,
+            downloadProgress = downloadProgress,
+            onStartDownload = { downloadUrl, fileName ->
+                viewModel.startDownloadApk(context, downloadUrl, fileName)
+            },
+            onCancelDownload = {
+                viewModel.cancelDownload()
+            },
+            onRetry = {
+                viewModel.checkForUpdates(currentAppVersion)
+            },
+            onDismiss = {
+                showUpdateDialog = false
+                viewModel.resetUpdateState()
+            }
+        )
+    }
+
     // 重置数据确认弹窗
     if (showResetDialog) {
         OverlayDialog(
@@ -350,19 +422,22 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "此操作将清空当前所有修改并重置为 2026年 8月~12月的原始预算与流水记录，是否继续？",
+                    text = "此操作将清空当前所有记账流水与自定义预算，并恢复为初始 2026年 8~12月的示范数据。该操作不可撤销，是否继续？",
                     fontSize = 14.sp,
-                    color = MiuixTheme.colorScheme.onSurface
+                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                    lineHeight = 20.sp
                 )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
                         onClick = { showResetDialog = false },
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(color = MiuixTheme.colorScheme.surfaceVariant)
+                        colors = ButtonDefaults.buttonColors(
+                            color = MiuixTheme.colorScheme.surfaceVariant
+                        )
                     ) {
                         Text(text = "取消", color = MiuixTheme.colorScheme.onSurface)
                     }
@@ -373,9 +448,11 @@ fun SettingsScreen(
                             showResetDialog = false
                         },
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(color = MiuixRed)
+                        colors = ButtonDefaults.buttonColors(
+                            color = MiuixRed
+                        )
                     ) {
-                        Text(text = "确认重置", color = Color.White)
+                        Text(text = "确认重置", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -383,60 +460,83 @@ fun SettingsScreen(
     }
 }
 
+/**
+ * 设置项单行通用组件。
+ */
 @Composable
 private fun SettingItemRow(
     icon: ImageVector,
     iconBackgroundColor: Color,
     primaryTitle: String,
     secondaryTitle: String,
+    badgeText: String? = null,
     onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(
+                    color = iconBackgroundColor.copy(alpha = 0.12f),
+                    shape = MiuixShapes.MediumSquircle
+                ),
+            contentAlignment = Alignment.Center
         ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconBackgroundColor,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 14.dp)
+        ) {
+            Text(
+                text = primaryTitle,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.onSurface
+            )
+            Text(
+                text = secondaryTitle,
+                fontSize = 12.sp,
+                color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                lineHeight = 16.sp
+            )
+        }
+
+        if (badgeText != null) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
-                    .background(iconBackgroundColor.copy(alpha = 0.12f), MiuixShapes.SmallSquircle),
-                contentAlignment = Alignment.Center
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MiuixBlue.copy(alpha = 0.12f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconBackgroundColor,
-                    modifier = Modifier.size(18.dp)
+                Text(
+                    text = badgeText,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixBlue
                 )
             }
-
-            Column {
-                Text(
-                    text = primaryTitle,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MiuixTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = secondaryTitle,
-                    fontSize = 11.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceSecondary
-                )
-            }
+            Spacer(modifier = Modifier.width(6.dp))
         }
 
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
-            tint = MiuixTheme.colorScheme.onSurfaceSecondary,
-            modifier = Modifier.size(18.dp)
+            tint = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.6f),
+            modifier = Modifier.size(20.dp)
         )
     }
 }

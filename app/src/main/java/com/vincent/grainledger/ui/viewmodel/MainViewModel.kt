@@ -1,6 +1,7 @@
 package com.vincent.grainledger.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vincent.grainledger.data.excel.ExcelHelper
@@ -10,23 +11,29 @@ import com.vincent.grainledger.data.model.BudgetItem
 import com.vincent.grainledger.data.model.MonthlyOverview
 import com.vincent.grainledger.data.model.TransactionRecord
 import com.vincent.grainledger.data.repository.LedgerRepository
+import com.vincent.grainledger.data.updater.AppUpdaterService
+import com.vincent.grainledger.data.updater.DownloadProgress
+import com.vincent.grainledger.data.updater.DownloadStatus
+import com.vincent.grainledger.data.updater.UpdateCheckState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 
 /**
  * 余粮全局核心视图模型 (ViewModel)。
  *
- * 统一承载当前选中的年月、月度综合看板数据、预算细项列表、每日记账流水、资金池配平健康检查，
- * 并响应数据变动自动刷新全量 UI。
+ * 统一承载当前选中的年月、月度综合看板数据、预算细项列表、每日记账流水、资金池配平健康检查、
+ * 检查更新与高速下载状态，并响应数据变动自动刷新全量 UI。
  */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = LedgerRepository(application)
+    private val updaterService = AppUpdaterService()
 
     // 当前选中的年份与月份（默认为 2026年 8月）
     private val _currentYear = MutableStateFlow(2026)
@@ -59,65 +66,73 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _allCategories = MutableStateFlow<List<BudgetCategory>>(emptyList())
     val allCategories: StateFlow<List<BudgetCategory>> = _allCategories.asStateFlow()
 
-    // 提示信息通知流
+    // 提示信息流
     private val _toastMessage = MutableStateFlow<String?>(null)
     val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
 
-    // 主题深色模式设置（null 代表跟随系统，true 代表强制深色，false 代表强制浅色纯白）
-    private val _darkModePreference = MutableStateFlow<Boolean?>(null)
-    val darkModePreference: StateFlow<Boolean?> = _darkModePreference.asStateFlow()
-
-    // 正在进行 Excel 处理状态
+    // 文件导入导出中状态
     private val _isProcessingFile = MutableStateFlow(false)
     val isProcessingFile: StateFlow<Boolean> = _isProcessingFile.asStateFlow()
 
+    // 深色模式偏好：null 跟随系统，true 纯黑深色，false 纯白浅色
+    private val _darkModePreference = MutableStateFlow<Boolean?>(null)
+    val darkModePreference: StateFlow<Boolean?> = _darkModePreference.asStateFlow()
+
+    // 检查更新状态
+    private val _updateCheckState = MutableStateFlow<UpdateCheckState>(UpdateCheckState.Idle)
+    val updateCheckState: StateFlow<UpdateCheckState> = _updateCheckState.asStateFlow()
+
+    // 实时下载进度
+    private val _downloadProgress = MutableStateFlow(DownloadProgress())
+    val downloadProgress: StateFlow<DownloadProgress> = _downloadProgress.asStateFlow()
+
     init {
-        // 监听数据仓库版本变化，自动重新加载数据
+        // 监听底层数据库版本变动，自动刷新界面
         viewModelScope.launch {
             repository.dataVersionFlow.collectLatest {
-                refreshAllData()
+                loadAllData()
             }
         }
-        refreshAllData()
     }
 
     /**
-     * 切换当前查看与记账的月份。
+     * 加载当前选定月份的所有业务数据。
      */
-    fun selectMonth(year: Int, month: Int) {
-        _currentYear.value = year
-        _currentMonth.value = month
-        refreshAllData()
-    }
-
-    /**
-     * 刷新当前所选年月的全部聚合与列表数据。
-     */
-    fun refreshAllData() {
+    fun loadAllData() {
         viewModelScope.launch {
             val year = _currentYear.value
             val month = _currentMonth.value
 
-            _availableMonths.value = repository.getAvailableMonths()
             _allCategories.value = repository.getAllCategories()
+            _availableMonths.value = repository.getAvailableMonths()
             _currentBudgetItems.value = repository.getBudgetItemsByMonth(year, month)
             _currentTransactions.value = repository.getTransactionsByMonth(year, month)
             _monthlyOverview.value = repository.getMonthlyOverview(year, month)
-            _balanceCheckResult.value = repository.getBalanceCheck(year, month, 10000.0)
+            _balanceCheckResult.value = repository.getBalanceCheck(year, month)
         }
     }
 
     /**
-     * 执行一笔快速记账。
-     *
-     * @param year 发生年份
-     * @param month 发生月份
-     * @param day 发生日期
-     * @param categoryName 归属大类
-     * @param detailName 对应预算细项
-     * @param amount 交易金额（支出为负数，如 -180.59）
-     * @param funder 支付出资人
-     * @param remark 交易备注
+     * 切换选定的年份与月份。
+     */
+    fun selectMonth(year: Int, month: Int) {
+        _currentYear.value = year
+        _currentMonth.value = month
+        loadAllData()
+    }
+
+    /**
+     * 新增记账流水。
+     */
+    fun addTransaction(transaction: TransactionRecord) {
+        viewModelScope.launch {
+            repository.recordTransaction(transaction)
+            _toastMessage.value = "记账成功！已实时更新细项与大类结余"
+        }
+    }
+
+    /**
+     * 新增记账流水（快捷参数重载）。
      */
     fun recordTransaction(
         year: Int,
@@ -126,69 +141,74 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         categoryName: String,
         detailName: String,
         amount: Double,
-        funder: String = "默认账户",
-        remark: String = ""
+        funder: String,
+        remark: String
     ) {
-        viewModelScope.launch {
-            val newRecord = TransactionRecord(
-                recordId = 0L,
-                year = year,
-                month = month,
-                day = day,
-                categoryName = categoryName,
-                detailName = detailName,
-                amount = amount,
-                funder = funder,
-                remark = remark
-            )
-            repository.recordTransaction(newRecord)
-            _toastMessage.value = "记账成功！已扣减相应预算额度"
-        }
+        val record = TransactionRecord(
+            recordId = 0L,
+            year = year,
+            month = month,
+            day = day,
+            categoryName = categoryName,
+            detailName = detailName,
+            amount = amount,
+            itemRemaining = 0.0,
+            categoryRemaining = 0.0,
+            funder = funder,
+            remark = remark,
+            timestamp = System.currentTimeMillis()
+        )
+        addTransaction(record)
     }
 
     /**
-     * 删除指定的一笔交易流水记录。
+     * 删除指定交易流水。
      */
     fun deleteTransaction(recordId: Long) {
         viewModelScope.launch {
             val success = repository.deleteTransaction(recordId)
             if (success) {
-                _toastMessage.value = "已删除该条账单记录并恢复对应预算额度"
+                _toastMessage.value = "已删除该笔流水并还原预算结余"
             }
         }
     }
 
     /**
-     * 保存或更新预算项。
+     * 保存或编辑预算细项。
      */
-    fun saveBudgetItem(budgetItem: BudgetItem) {
+    fun saveBudgetItem(item: BudgetItem) {
         viewModelScope.launch {
-            repository.saveBudgetItem(budgetItem)
-            _toastMessage.value = "预算项目「${budgetItem.detailName}」保存成功"
+            repository.saveBudgetItem(item)
+            _toastMessage.value = "预算细项保存成功！"
         }
     }
 
     /**
-     * 删除指定的预算项。
+     * 删除预算细项。
      */
     fun deleteBudgetItem(itemId: Long) {
         viewModelScope.launch {
             val success = repository.deleteBudgetItem(itemId)
             if (success) {
-                _toastMessage.value = "已成功删除该预算项目"
+                _toastMessage.value = "预算细项已删除"
             }
         }
     }
 
     /**
-     * 从 Excel 输入流导入数据。
+     * 从 Excel 流中导入数据。
      */
     fun importExcelData(inputStream: InputStream) {
         viewModelScope.launch {
             _isProcessingFile.value = true
             try {
                 val result = ExcelHelper.importFromExcelStream(inputStream, repository)
-                _toastMessage.value = result.message
+                if (result.isSuccess) {
+                    _toastMessage.value = "Excel 导入成功！共导入 ${result.importedBudgetCount} 条预算，${result.importedTransactionCount} 条流水"
+                    loadAllData()
+                } else {
+                    _toastMessage.value = "导入失败: ${result.message}"
+                }
             } catch (exception: Exception) {
                 _toastMessage.value = "导入出错: ${exception.localizedMessage}"
             } finally {
@@ -212,6 +232,61 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _isProcessingFile.value = false
             }
         }
+    }
+
+    /**
+     * 触发检查应用更新。
+     *
+     * @param currentVersion 当前应用版本号
+     */
+    fun checkForUpdates(currentVersion: String) {
+        viewModelScope.launch {
+            _updateCheckState.value = UpdateCheckState.Checking
+            val resultState = updaterService.checkForUpdate(currentVersion)
+            _updateCheckState.value = resultState
+        }
+    }
+
+    /**
+     * 开始下载新版本 APK。
+     *
+     * @param context Android 上下文
+     * @param downloadUrl 加速下载链接
+     * @param fileName 安装包文件名
+     */
+    fun startDownloadApk(context: Context, downloadUrl: String, fileName: String) {
+        viewModelScope.launch {
+            val cacheDirectory = context.externalCacheDir ?: context.cacheDir
+            val destinationApkFile = File(cacheDirectory, fileName)
+
+            val downloadSuccess = updaterService.downloadApkFile(
+                downloadUrl = downloadUrl,
+                destinationFile = destinationApkFile,
+                onProgress = { progress ->
+                    _downloadProgress.value = progress
+                }
+            )
+
+            if (downloadSuccess && destinationApkFile.exists()) {
+                updaterService.installApk(context, destinationApkFile)
+            }
+        }
+    }
+
+    /**
+     * 取消进行中的下载。
+     */
+    fun cancelDownload() {
+        updaterService.cancelDownload()
+        _downloadProgress.value = DownloadProgress(status = DownloadStatus.CANCELED)
+    }
+
+    /**
+     * 重置检查更新状态。
+     */
+    fun resetUpdateState() {
+        _updateCheckState.value = UpdateCheckState.Idle
+        _downloadProgress.value = DownloadProgress()
     }
 
     /**
