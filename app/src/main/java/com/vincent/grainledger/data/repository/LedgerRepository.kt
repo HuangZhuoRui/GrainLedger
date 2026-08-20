@@ -16,12 +16,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 /**
- * 余粮统一数据仓库 (面向对象 DAO 数据库驱动版)。
+ * 余粮统一数据仓库 (带内存多级缓存与增量失效机制)。
  *
- * 基于 GrainLedgerDatabase 与 CategoryDao / BudgetItemDao / TransactionDao 构建，
- * 封装多表级联原子事务、双剩余自动实时核算、资金配平校验及 Excel 导入持久化。
+ * 核心架构：
+ * 1. 读操作全量走内存极速缓存，0ms 瞬时响应，避免滑月/切 Tab/浏览时的重复 SQLite 查询与反复重算；
+ * 2. 写操作（增删改流水、预算、分类、月份）精准执行局部增量失效与波及链式滚存失效，保证数据绝对准确 (SSOT)。
  */
 class LedgerRepository(context: Context) {
 
@@ -29,6 +32,14 @@ class LedgerRepository(context: Context) {
     private val categoryDao = database.categoryDao
     private val budgetItemDao = database.budgetItemDao
     private val transactionDao = database.transactionDao
+
+    // ==================== 内存多级高速缓存 ====================
+    private val categoryCache = AtomicReference<List<BudgetCategory>?>(null)
+    private val availableMonthsCache = AtomicReference<List<Pair<Int, Int>>?>(null)
+    private val budgetItemsCache = ConcurrentHashMap<Pair<Int, Int>, List<BudgetItem>>()
+    private val transactionsCache = ConcurrentHashMap<Pair<Int, Int>, List<TransactionRecord>>()
+    private val monthlyOverviewCache = ConcurrentHashMap<Pair<Int, Int>, MonthlyOverview>()
+    private val balanceCheckCache = ConcurrentHashMap<Pair<Int, Int>, BalanceCheckResult>()
 
     // 内存数据版本触发流，用于状态变更通知
     private val _dataVersionFlow = MutableStateFlow(0L)
@@ -39,10 +50,44 @@ class LedgerRepository(context: Context) {
     }
 
     /**
-     * 获取所有预算分类列表（按排序序号升序排列）。
+     * 全局清空所有内存缓存。
+     */
+    private fun invalidateAllCaches() {
+        categoryCache.set(null)
+        availableMonthsCache.set(null)
+        budgetItemsCache.clear()
+        transactionsCache.clear()
+        monthlyOverviewCache.clear()
+        balanceCheckCache.clear()
+    }
+
+    /**
+     * 精准失效指定月份及后续受链式滚存波及月份的缓存。
+     */
+    private fun invalidateMonthAndFuture(year: Int, month: Int) {
+        val monthKey = Pair(year, month)
+        budgetItemsCache.remove(monthKey)
+        transactionsCache.remove(monthKey)
+        balanceCheckCache.remove(monthKey)
+        availableMonthsCache.set(null)
+
+        // 历史发生变动，波及当前月及以后所有月份的链式滚存结果，予以精准失效
+        monthlyOverviewCache.keys.filter {
+            it.first > year || (it.first == year && it.second >= month)
+        }.forEach {
+            monthlyOverviewCache.remove(it)
+        }
+    }
+
+    /**
+     * 获取所有预算分类列表（内存缓存加速）。
      */
     suspend fun getAllCategories(): List<BudgetCategory> = withContext(Dispatchers.IO) {
-        categoryDao.getAllCategories()
+        categoryCache.get() ?: run {
+            val loaded = categoryDao.getAllCategories()
+            categoryCache.set(loaded)
+            loaded
+        }
     }
 
     /**
@@ -55,6 +100,8 @@ class LedgerRepository(context: Context) {
         } else {
             categoryDao.insertCategory(category)
         }
+        // 分类变动影响全局信封与展示，全面刷新
+        invalidateAllCaches()
         notifyDataChanged()
         resultId
     }
@@ -78,6 +125,7 @@ class LedgerRepository(context: Context) {
             }
             categoryDao.deleteCategory(category.categoryId, db)
         }
+        invalidateAllCaches()
         notifyDataChanged()
         true
     }
@@ -90,31 +138,31 @@ class LedgerRepository(context: Context) {
     }
 
     /**
-     * 获取指定月份的全部记账流水记录（按日期降序排列）。
+     * 获取指定月份的全部记账流水记录（按日期降序排列，内存缓存加速）。
      */
     suspend fun getTransactionsByMonth(year: Int, month: Int): List<TransactionRecord> = withContext(Dispatchers.IO) {
-        transactionDao.getTransactionsByMonth(year, month)
+        val key = Pair(year, month)
+        transactionsCache.computeIfAbsent(key) {
+            transactionDao.getTransactionsByMonth(year, month)
+        }
     }
 
     /**
-     * 获取指定年月的全部预算项列表。
-     *
-     * @param year 指定年份
-     * @param month 指定月份
-     * @return 预算细项列表
+     * 获取指定年月的全部预算项列表（内存缓存加速）。
      */
     suspend fun getBudgetItemsByMonth(year: Int, month: Int): List<BudgetItem> = withContext(Dispatchers.IO) {
-        budgetItemDao.getBudgetItemsByMonth(year, month)
+        val key = Pair(year, month)
+        budgetItemsCache.computeIfAbsent(key) {
+            budgetItemDao.getBudgetItemsByMonth(year, month)
+        }
     }
 
     /**
      * 保存或更新预算细项。
-     *
-     * @param budgetItem 待保存的预算实体
-     * @return 插入或更新后的数据库主键标识
      */
     suspend fun saveBudgetItem(budgetItem: BudgetItem): Long = withContext(Dispatchers.IO) {
         val resultId = budgetItemDao.saveBudgetItem(budgetItem)
+        invalidateMonthAndFuture(budgetItem.year, budgetItem.month)
         notifyDataChanged()
         resultId
     }
@@ -126,15 +174,39 @@ class LedgerRepository(context: Context) {
         database.runInTransaction { db ->
             budgetItems.forEach { budgetItemDao.saveBudgetItem(it, db) }
         }
+        val affectedMonths = budgetItems.map { Pair(it.year, it.month) }.distinct()
+        affectedMonths.forEach { (y, m) -> invalidateMonthAndFuture(y, m) }
         notifyDataChanged()
     }
 
     /**
      * 删除指定的预算项。
      */
+    suspend fun deleteBudgetItem(item: BudgetItem): Boolean = withContext(Dispatchers.IO) {
+        val rowsAffected = budgetItemDao.deleteBudgetItem(item.itemId)
+        if (rowsAffected > 0) {
+            invalidateMonthAndFuture(item.year, item.month)
+            notifyDataChanged()
+            true
+        } else {
+            false
+        }
+    }
+
+    /**
+     * 根据主键删除预算项。
+     */
     suspend fun deleteBudgetItem(itemId: Long): Boolean = withContext(Dispatchers.IO) {
+        // 先读取以便精准知道年月
+        val allBudgets = budgetItemDao.getAllBudgetItems()
+        val target = allBudgets.find { it.itemId == itemId }
         val rowsAffected = budgetItemDao.deleteBudgetItem(itemId)
         if (rowsAffected > 0) {
+            if (target != null) {
+                invalidateMonthAndFuture(target.year, target.month)
+            } else {
+                invalidateAllCaches()
+            }
             notifyDataChanged()
             true
         } else {
@@ -166,7 +238,7 @@ class LedgerRepository(context: Context) {
                     budgetItemDao.saveBudgetItem(clonedItem, db)
                 }
             } else {
-                // 若不复制，则为新月份插入一条默认分类的空预算项或直接保留空列表
+                // 若不复制，则为新月份插入一条默认分类的空预算项
                 val firstCategory = categoryDao.getAllCategories().firstOrNull()?.categoryName ?: "强制类"
                 val emptyItem = BudgetItem(
                     itemId = 0L,
@@ -186,117 +258,115 @@ class LedgerRepository(context: Context) {
                 budgetItemDao.saveBudgetItem(emptyItem, db)
             }
         }
+        invalidateMonthAndFuture(targetYear, targetMonth)
         notifyDataChanged()
         true
     }
 
     /**
-     * 获取所有可用的年份与月份列表。
+     * 获取所有可用的年份与月份列表（内存缓存加速）。
      */
     suspend fun getAvailableMonths(): List<Pair<Int, Int>> = withContext(Dispatchers.IO) {
-        val budgetMonths = budgetItemDao.getAvailableMonths()
-        val txMonths = transactionDao.getAvailableMonths()
-        val combined = (budgetMonths + txMonths).distinct().sortedWith(Comparator { a, b ->
-            if (a.first != b.first) a.first.compareTo(b.first) else a.second.compareTo(b.second)
-        })
-        if (combined.isNotEmpty()) {
-            combined
-        } else {
-            // 默认若为空则仅提供初始月份（2026年8月），其余月份由用户通过“加月份”按需新建
-            listOf(Pair(2026, 8))
+        availableMonthsCache.get() ?: run {
+            val budgetMonths = budgetItemDao.getAvailableMonths()
+            val txMonths = transactionDao.getAvailableMonths()
+            val combined = (budgetMonths + txMonths).distinct().sortedWith(Comparator { a, b ->
+                if (a.first != b.first) a.first.compareTo(b.first) else a.second.compareTo(b.second)
+            })
+            val result = if (combined.isNotEmpty()) {
+                combined
+            } else {
+                listOf(Pair(2026, 8))
+            }
+            availableMonthsCache.set(result)
+            result
         }
     }
 
     /**
      * 新增一笔记账流水，并在数据库事务中自动联动计算【具体剩余】与【类剩余】，同时扣减对应预算项的结余。
-     *
-     * @param transaction 待录入的交易记录
-     * @return 新增流水主键标识
      */
     suspend fun recordTransaction(transaction: TransactionRecord): Long = withContext(Dispatchers.IO) {
-        database.runInTransaction { db ->
+        val resultId = database.runInTransaction { db ->
             val isIncome = transaction.amount > 0
 
             val computedItemRemaining: Double
             val computedCategoryRemaining: Double
 
             if (isIncome) {
-                // 收入入账：收入属于单笔入账流水，不属于预设预算细项
-                val monthTransactions = transactionDao.getTransactionsByMonth(transaction.year, transaction.month)
-                    .filter { it.categoryName == transaction.categoryName && it.amount > 0 }
-                val previousCategoryIncome = monthTransactions.sumOf { it.amount }
-                val newCategoryIncome = BigDecimal(previousCategoryIncome + transaction.amount).setScale(2, RoundingMode.HALF_UP).toDouble()
-
-                computedItemRemaining = BigDecimal(transaction.amount).setScale(2, RoundingMode.HALF_UP).toDouble()
-                computedCategoryRemaining = newCategoryIncome
+                // 收入记账：直接累加该收入大类当前月的入账总量
+                val curTrans = transactionDao.getTransactionsByMonth(transaction.year, transaction.month)
+                val curCatIncome = curTrans.filter { it.categoryName == transaction.categoryName && it.amount > 0 }.sumOf { it.amount }
+                computedItemRemaining = transaction.amount
+                computedCategoryRemaining = curCatIncome + transaction.amount
             } else {
-                // 支出记账：从预算细项中扣减已消费与结余
-                val matchedItem = budgetItemDao.findBudgetItem(
+                // 支出记账：联动更新对应预算项并扣减剩余
+                val expenseAmount = transaction.absoluteAmount
+                val existingItem = budgetItemDao.findBudgetItem(
                     transaction.year,
                     transaction.month,
                     transaction.categoryName,
                     transaction.detailName,
                     db
                 )
-                val spentIncrease = -transaction.amount // 负数转为正数消费
-                if (matchedItem != null) {
-                    val newActualSpent = matchedItem.actualSpent + spentIncrease
-                    val newBalance = matchedItem.actualAllocated - newActualSpent
-                    computedItemRemaining = BigDecimal(newBalance).setScale(2, RoundingMode.HALF_UP).toDouble()
 
-                    budgetItemDao.updateSpentAndBalance(
-                        itemId = matchedItem.itemId,
-                        actualSpent = newActualSpent,
-                        balance = newBalance,
-                        db = db
-                    )
+                if (existingItem != null) {
+                    val newSpent = existingItem.actualSpent + expenseAmount
+                    val newBalance = existingItem.actualAllocated - newSpent
+                    budgetItemDao.updateSpentAndBalance(existingItem.itemId, newSpent, newBalance, db)
+                    computedItemRemaining = newBalance
                 } else {
-                    computedItemRemaining = 0.0
+                    computedItemRemaining = -expenseAmount
                 }
 
+                // 重新统计该支出大类的全部结余
                 val categoryItems = budgetItemDao.getBudgetItemsByMonth(transaction.year, transaction.month)
                     .filter { it.categoryName == transaction.categoryName }
-
-                val categoryTotalAllocated = categoryItems.sumOf { it.actualAllocated }
-                val categoryTotalSpent = categoryItems.sumOf { it.actualSpent }
-                computedCategoryRemaining = BigDecimal(categoryTotalAllocated - categoryTotalSpent).setScale(2, RoundingMode.HALF_UP).toDouble()
+                val totalAllocated = categoryItems.sumOf { it.actualAllocated }
+                val totalSpent = categoryItems.sumOf { it.actualSpent } + (if (existingItem == null) expenseAmount else 0.0)
+                computedCategoryRemaining = totalAllocated - totalSpent
             }
 
-            // 写入流水表
-            val recordToSave = transaction.copy(
+            val finalRecord = transaction.copy(
                 itemRemaining = computedItemRemaining,
                 categoryRemaining = computedCategoryRemaining
             )
-            val newId = transactionDao.insertTransaction(recordToSave, db)
-            notifyDataChanged()
-            newId
+
+            transactionDao.insertTransaction(finalRecord, db)
         }
+
+        invalidateMonthAndFuture(transaction.year, transaction.month)
+        notifyDataChanged()
+        resultId
     }
 
     /**
-     * 删除指定的交易流水，并在数据库事务中回退预算细项中的已消费和结余。
+     * 删除一笔交易流水，并在数据库事务中自动反算回补细项与大类的剩余金额。
      */
-    suspend fun deleteTransaction(recordId: Long): Boolean = withContext(Dispatchers.IO) {
-        database.runInTransaction { db ->
-            val targetRecord = transactionDao.getTransactionById(recordId, db)
-            if (targetRecord != null) {
-                val isIncome = targetRecord.amount > 0
-                if (!isIncome) {
-                    // 支出流水删除：回退扣减已消费金额，恢复可用结余
-                    val matchedItem = budgetItemDao.findBudgetItem(
-                        targetRecord.year,
-                        targetRecord.month,
-                        targetRecord.categoryName,
-                        targetRecord.detailName,
+    suspend fun deleteTransaction(record: TransactionRecord): Boolean = withContext(Dispatchers.IO) {
+        val success = database.runInTransaction { db ->
+            val recordId = record.recordId
+            val existingRecord = transactionDao.getTransactionsByMonth(record.year, record.month)
+                .find { it.recordId == recordId }
+
+            if (existingRecord != null) {
+                // 若是支出流水，回退扣减的预算项消费
+                if (existingRecord.amount < 0) {
+                    val refundAmount = existingRecord.absoluteAmount
+                    val targetItem = budgetItemDao.findBudgetItem(
+                        existingRecord.year,
+                        existingRecord.month,
+                        existingRecord.categoryName,
+                        existingRecord.detailName,
                         db
                     )
-                    if (matchedItem != null) {
-                        val restoredSpent = (matchedItem.actualSpent - (-targetRecord.amount)).coerceAtLeast(0.0)
-                        val restoredBalance = matchedItem.actualAllocated - restoredSpent
+                    if (targetItem != null) {
+                        val newSpent = (targetItem.actualSpent - refundAmount).coerceAtLeast(0.0)
+                        val newBalance = targetItem.actualAllocated - newSpent
                         budgetItemDao.updateSpentAndBalance(
-                            itemId = matchedItem.itemId,
-                            actualSpent = restoredSpent,
-                            balance = restoredBalance,
+                            itemId = targetItem.itemId,
+                            actualSpent = newSpent,
+                            balance = newBalance,
                             db = db
                         )
                     }
@@ -304,6 +374,31 @@ class LedgerRepository(context: Context) {
 
                 // 删除流水
                 transactionDao.deleteTransaction(recordId, db)
+                true
+            } else {
+                false
+            }
+        }
+
+        if (success) {
+            invalidateMonthAndFuture(record.year, record.month)
+            notifyDataChanged()
+        }
+        success
+    }
+
+    /**
+     * 根据主键删除交易流水（重载方法）。
+     */
+    suspend fun deleteTransaction(recordId: Long): Boolean = withContext(Dispatchers.IO) {
+        val allTxs = transactionDao.getAllTransactions()
+        val targetRecord = allTxs.find { it.recordId == recordId }
+        if (targetRecord != null) {
+            deleteTransaction(targetRecord)
+        } else {
+            val rows = transactionDao.deleteTransaction(recordId)
+            if (rows > 0) {
+                invalidateAllCaches()
                 notifyDataChanged()
                 true
             } else {
@@ -313,13 +408,23 @@ class LedgerRepository(context: Context) {
     }
 
     /**
-     * 计算并获取指定年月的月度综合汇总数据（对应《综合查看》看板）。
+     * 获取指定年月的月度综合汇总数据（内存缓存加速 + 增量失效）。
      */
     suspend fun getMonthlyOverview(year: Int, month: Int): MonthlyOverview = withContext(Dispatchers.IO) {
-        val budgetItems = getBudgetItemsByMonth(year, month)
-        val allCats = getAllCategories()
+        val key = Pair(year, month)
+        monthlyOverviewCache.computeIfAbsent(key) {
+            computeMonthlyOverviewInternal(year, month)
+        }
+    }
+
+    /**
+     * 内部月度综合数据计算逻辑。
+     */
+    private fun computeMonthlyOverviewInternal(year: Int, month: Int): MonthlyOverview {
+        val budgetItems = budgetItemDao.getBudgetItemsByMonth(year, month)
+        val allCats = categoryDao.getAllCategories()
         val categoryMap = allCats.associateBy { it.categoryName }
-        val transactions = getTransactionsByMonth(year, month)
+        val transactions = transactionDao.getTransactionsByMonth(year, month)
 
         // 1. 仅支出类预算细项
         val expenseBudgetItems = budgetItems.filter { categoryMap[it.categoryName]?.isIncome != true }
@@ -408,7 +513,7 @@ class LedgerRepository(context: Context) {
             )
         }.sortedBy { categoryMap[it.categoryName]?.sortOrder ?: 99 }
 
-        MonthlyOverview(
+        return MonthlyOverview(
             year = year,
             month = month,
             totalPlannedBudget = totalPlanned,
@@ -423,23 +528,21 @@ class LedgerRepository(context: Context) {
     }
 
     /**
-     * 资金池配平健康检查（对应 Excel《草稿页》）。
-     *
-     * @param year 年份
-     * @param month 月份
-     * @param targetBenchmarkFund 初始基准金额（默认 10000.00）
-     * @return 配平检查结果
+     * 资金池配平健康检查（内存缓存加速）。
      */
     suspend fun getBalanceCheck(year: Int, month: Int, targetBenchmarkFund: Double = 10000.0): BalanceCheckResult = withContext(Dispatchers.IO) {
-        val budgetItems = getBudgetItemsByMonth(year, month)
-        val allocatedTotal = BigDecimal(budgetItems.sumOf { it.actualAllocated }).setScale(2, RoundingMode.HALF_UP).toDouble()
-        val difference = BigDecimal(targetBenchmarkFund - allocatedTotal).setScale(2, RoundingMode.HALF_UP).toDouble()
+        val key = Pair(year, month)
+        balanceCheckCache.computeIfAbsent(key) {
+            val budgetItems = budgetItemDao.getBudgetItemsByMonth(year, month)
+            val allocatedTotal = BigDecimal(budgetItems.sumOf { it.actualAllocated }).setScale(2, RoundingMode.HALF_UP).toDouble()
+            val difference = BigDecimal(targetBenchmarkFund - allocatedTotal).setScale(2, RoundingMode.HALF_UP).toDouble()
 
-        BalanceCheckResult(
-            targetBenchmarkFund = targetBenchmarkFund,
-            allocatedTotalFund = allocatedTotal,
-            balanceDifference = difference
-        )
+            BalanceCheckResult(
+                targetBenchmarkFund = targetBenchmarkFund,
+                allocatedTotalFund = allocatedTotal,
+                balanceDifference = difference
+            )
+        }
     }
 
     /**
@@ -454,6 +557,7 @@ class LedgerRepository(context: Context) {
             // 重新初始化写入预置数据
             database.seedInitialDatabaseData(db)
         }
+        invalidateAllCaches()
         notifyDataChanged()
     }
 }
