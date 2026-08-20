@@ -17,6 +17,11 @@ android {
         versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // 仅打包 64 位 ARM 原生架构 (arm64-v8a)，大幅缩减 APK 体积
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     signingConfigs {
