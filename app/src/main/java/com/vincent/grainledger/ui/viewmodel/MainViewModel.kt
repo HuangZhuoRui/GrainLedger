@@ -247,6 +247,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * 清空数据库中所有的预算细项与记账流水记录（空白账本）。
+     */
+    fun clearAllData() {
+        viewModelScope.launch {
+            repository.clearAllData()
+            _toastMessage.value = "已成功清空所有数据！"
+            val calendar = java.util.Calendar.getInstance()
+            _currentYear.value = calendar.get(java.util.Calendar.YEAR)
+            _currentMonth.value = calendar.get(java.util.Calendar.MONTH) + 1
+            loadAllData()
+        }
+    }
+
+    /**
      * 新建月份账本，并支持一键从当前月份复制预算结构。
      */
     fun createMonth(targetYear: Int, targetMonth: Int, copyFromCurrent: Boolean) {

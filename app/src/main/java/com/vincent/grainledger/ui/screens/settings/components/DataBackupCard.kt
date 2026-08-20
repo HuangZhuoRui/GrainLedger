@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.CircularProgressIndicator
@@ -21,12 +22,13 @@ import com.vincent.grainledger.ui.theme.MiuixRed
 /**
  * 数据备份与 Excel 互通管理卡片 (DataBackupCard)。
  *
- * 提供标准 Excel 格式账单导入、导出及初始数据重置操作。
+ * 提供标准 Excel 格式账单导入、导出、清空所有数据及初始数据重置操作。
  *
  * @param isProcessingFile 是否正在进行文件 IO 处理
  * @param onImportClick 点击导入 Excel 回调
  * @param onExportClick 点击导出 Excel 回调
  * @param onResetClick 点击重置初始数据回调
+ * @param onClearAllDataClick 点击清除所有数据回调
  * @param modifier 外部修饰符
  */
 @Composable
@@ -35,6 +37,7 @@ fun DataBackupCard(
     onImportClick: () -> Unit,
     onExportClick: () -> Unit,
     onResetClick: () -> Unit,
+    onClearAllDataClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     MiuixSectionCard(
@@ -71,8 +74,16 @@ fun DataBackupCard(
                 title = "重置为默认初始数据",
                 subtitle = "清空现有数据库并重新加载初始测试账目",
                 icon = Icons.Default.Refresh,
-                iconTint = MiuixRed,
+                iconTint = MiuixBlue,
                 onClick = onResetClick
+            )
+
+            SettingItemRow(
+                title = "清除所有数据",
+                subtitle = "彻底删除所有月份预算规划、流水记录与自定义数据",
+                icon = Icons.Default.DeleteForever,
+                iconTint = MiuixRed,
+                onClick = onClearAllDataClick
             )
         }
     }

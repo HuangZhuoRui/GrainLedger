@@ -183,10 +183,9 @@ class GrainLedgerDatabase private constructor(context: Context) : SQLiteOpenHelp
     }
 
     /**
-     * 写入 2026年 8月~12月完整预算规划与流水数据。
+     * 仅初始化写入默认分类结构（不写入任何预算或流水数据）。
      */
-    fun seedInitialDatabaseData(db: SQLiteDatabase) {
-        // 1. 分类
+    fun seedDefaultCategories(db: SQLiteDatabase) {
         BudgetCategory.defaultCategories.forEach { category ->
             val values = ContentValues().apply {
                 put(COL_CAT_NAME, category.categoryName)
@@ -197,6 +196,14 @@ class GrainLedgerDatabase private constructor(context: Context) : SQLiteOpenHelp
             }
             db.insertWithOnConflict(TABLE_CATEGORIES, null, values, SQLiteDatabase.CONFLICT_REPLACE)
         }
+    }
+
+    /**
+     * 写入 2026年 8月~12月完整预算规划与流水数据。
+     */
+    fun seedInitialDatabaseData(db: SQLiteDatabase) {
+        // 1. 分类
+        seedDefaultCategories(db)
 
         // 2. 预算细项
         val initialBudgetItems = listOf(

@@ -56,6 +56,7 @@ fun SettingsScreen(
     val allCategories by viewModel.allCategories.collectAsState()
 
     var showResetDialog by remember { mutableStateOf(false) }
+    var showClearAllDataDialog by remember { mutableStateOf(false) }
     var showCategoryManagementDialog by remember { mutableStateOf(false) }
     val currentAppVersion = BuildConfig.VERSION_NAME
 
@@ -90,7 +91,7 @@ fun SettingsScreen(
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 96.dp),
+            contentPadding = PaddingValues(bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // 1. 顶部标题栏
@@ -172,6 +173,9 @@ fun SettingsScreen(
                     },
                     onResetClick = {
                         showResetDialog = true
+                    },
+                    onClearAllDataClick = {
+                        showClearAllDataDialog = true
                     }
                 )
             }
@@ -214,6 +218,22 @@ fun SettingsScreen(
                 },
                 onDismiss = {
                     showResetDialog = false
+                }
+            )
+        }
+
+        // 清除所有数据二次确认弹窗
+        if (showClearAllDataDialog) {
+            ConfirmDialog(
+                title = "清除所有数据",
+                message = "确定要彻底清空数据库中所有月份的预算规划、记账流水和自定义数据吗？此操作将完全抹除所有记录，恢复为空白账本状态且不可逆！",
+                confirmText = "确认清除",
+                onConfirm = {
+                    viewModel.clearAllData()
+                    showClearAllDataDialog = false
+                },
+                onDismiss = {
+                    showClearAllDataDialog = false
                 }
             )
         }

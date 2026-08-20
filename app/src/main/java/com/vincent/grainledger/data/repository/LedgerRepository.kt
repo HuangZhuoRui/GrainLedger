@@ -276,7 +276,8 @@ class LedgerRepository(context: Context) {
             val result = if (combined.isNotEmpty()) {
                 combined
             } else {
-                listOf(Pair(2026, 8))
+                val cal = java.util.Calendar.getInstance()
+                listOf(Pair(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1))
             }
             availableMonthsCache.set(result)
             result
@@ -556,6 +557,22 @@ class LedgerRepository(context: Context) {
 
             // 重新初始化写入预置数据
             database.seedInitialDatabaseData(db)
+        }
+        invalidateAllCaches()
+        notifyDataChanged()
+    }
+
+    /**
+     * 清空所有记账数据（清空所有月份预算、流水记录与自定义分类，并恢复默认空白分类体系）。
+     */
+    suspend fun clearAllData() = withContext(Dispatchers.IO) {
+        database.runInTransaction { db ->
+            transactionDao.clearAllTransactions(db)
+            budgetItemDao.clearAllBudgetItems(db)
+            categoryDao.clearAllCategories(db)
+
+            // 仅写入初始默认分类，不包含任何预算与流水
+            database.seedDefaultCategories(db)
         }
         invalidateAllCaches()
         notifyDataChanged()
