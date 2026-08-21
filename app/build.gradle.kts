@@ -13,8 +13,8 @@ android {
         applicationId = "com.vincent.grainledger"
         minSdk = 33
         targetSdk = 37
-        versionCode = 121
-        versionName = "1.2.1"
+        versionCode = 131
+        versionName = "1.3.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
