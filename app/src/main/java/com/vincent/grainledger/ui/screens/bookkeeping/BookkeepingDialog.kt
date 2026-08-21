@@ -9,6 +9,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -98,7 +100,7 @@ import kotlin.math.absoluteValue
  * 核心创新与体验升级：
  * 1. 采用 HorizontalPager 分步卡片流，支持手势 1:1 左右平滑滑动与按键导航；
  * 2. 具备与月份切换一致的物理弹簧阻尼、缩放 (0.92x~1.0x) 与渐变透明度 (0.5~1.0) 动效；
- * 3. 顶部步骤指示轴与标题采用物理缩放 (Scale + Fade) 联动过渡（SizeTransform clip=false）；
+ * 3. 顶部步骤指示轴与标题采用同向左右横向滑动与物理缩放 (Slide + Scale + Fade) 联动过渡；
  * 4. 三大步骤卡片高度统一固定为 370.dp，左右切换坚实无跳变；
  * 5. 所有横向滑动区域（分类、标签、月份、日期、账户）边缘增加平滑渐变羽化模糊过渡 (horizontalFadingEdge)；
  * 6. 记账日期 1~31 号滑轨智能居中定位当日或已选日期。
@@ -321,19 +323,32 @@ fun BookkeepingDialog(
                             targetState = Triple(pagerState.currentPage, stepTitle, stepSubtitle),
                             transitionSpec = {
                                 val isForward = targetState.first >= initialState.first
+                                val slideInOffset = if (isForward) { width: Int -> (width * 0.40f).toInt() } else { width: Int -> -(width * 0.40f).toInt() }
+                                val slideOutOffset = if (isForward) { width: Int -> -(width * 0.40f).toInt() } else { width: Int -> (width * 0.40f).toInt() }
+
                                 (
-                                    (scaleIn(
-                                        initialScale = if (isForward) 0.85f else 1.15f,
-                                        animationSpec = tween(240, easing = MiuixAnimation.MiuixDecelerateEasing)
-                                    ) + fadeIn(animationSpec = tween(220))) togetherWith
-                                    (scaleOut(
-                                        targetScale = if (isForward) 1.15f else 0.85f,
-                                        animationSpec = tween(180, easing = MiuixAnimation.MiuixFluidEasing)
-                                    ) + fadeOut(animationSpec = tween(180)))
+                                    (slideInHorizontally(
+                                        initialOffsetX = slideInOffset,
+                                        animationSpec = tween(280, easing = MiuixAnimation.MiuixDecelerateEasing)
+                                    ) + scaleIn(
+                                        initialScale = 0.90f,
+                                        animationSpec = tween(280, easing = MiuixAnimation.MiuixDecelerateEasing)
+                                    ) + fadeIn(
+                                        animationSpec = tween(240)
+                                    )) togetherWith
+                                    (slideOutHorizontally(
+                                        targetOffsetX = slideOutOffset,
+                                        animationSpec = tween(220, easing = MiuixAnimation.MiuixFluidEasing)
+                                    ) + scaleOut(
+                                        targetScale = 0.90f,
+                                        animationSpec = tween(220, easing = MiuixAnimation.MiuixFluidEasing)
+                                    ) + fadeOut(
+                                        animationSpec = tween(200)
+                                    ))
                                 ).using(SizeTransform(clip = false))
                             },
                             contentAlignment = Alignment.Center,
-                            label = "TitleScaleAnimation"
+                            label = "HorizontalSlideScaleTitleAnimation"
                         ) { (_, targetTitle, targetSubtitle) ->
                             Column(
                                 modifier = Modifier.fillMaxWidth(),

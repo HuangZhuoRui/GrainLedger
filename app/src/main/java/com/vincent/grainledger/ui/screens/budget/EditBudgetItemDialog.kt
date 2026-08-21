@@ -9,6 +9,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -293,19 +295,32 @@ fun EditBudgetItemDialog(
                             targetState = Triple(pagerState.currentPage, stepTitle, stepSubtitle),
                             transitionSpec = {
                                 val isForward = targetState.first >= initialState.first
+                                val slideInOffset = if (isForward) { width: Int -> (width * 0.40f).toInt() } else { width: Int -> -(width * 0.40f).toInt() }
+                                val slideOutOffset = if (isForward) { width: Int -> -(width * 0.40f).toInt() } else { width: Int -> (width * 0.40f).toInt() }
+
                                 (
-                                    (scaleIn(
-                                        initialScale = if (isForward) 0.85f else 1.15f,
-                                        animationSpec = tween(240, easing = MiuixAnimation.MiuixDecelerateEasing)
-                                    ) + fadeIn(animationSpec = tween(220))) togetherWith
-                                    (scaleOut(
-                                        targetScale = if (isForward) 1.15f else 0.85f,
-                                        animationSpec = tween(180, easing = MiuixAnimation.MiuixFluidEasing)
-                                    ) + fadeOut(animationSpec = tween(180)))
+                                    (slideInHorizontally(
+                                        initialOffsetX = slideInOffset,
+                                        animationSpec = tween(280, easing = MiuixAnimation.MiuixDecelerateEasing)
+                                    ) + scaleIn(
+                                        initialScale = 0.90f,
+                                        animationSpec = tween(280, easing = MiuixAnimation.MiuixDecelerateEasing)
+                                    ) + fadeIn(
+                                        animationSpec = tween(240)
+                                    )) togetherWith
+                                    (slideOutHorizontally(
+                                        targetOffsetX = slideOutOffset,
+                                        animationSpec = tween(220, easing = MiuixAnimation.MiuixFluidEasing)
+                                    ) + scaleOut(
+                                        targetScale = 0.90f,
+                                        animationSpec = tween(220, easing = MiuixAnimation.MiuixFluidEasing)
+                                    ) + fadeOut(
+                                        animationSpec = tween(200)
+                                    ))
                                 ).using(SizeTransform(clip = false))
                             },
                             contentAlignment = Alignment.Center,
-                            label = "BudgetTitleScaleAnimation"
+                            label = "BudgetHorizontalSlideScaleTitleAnimation"
                         ) { (_, targetTitle, targetSubtitle) ->
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
