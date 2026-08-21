@@ -1,6 +1,14 @@
 package com.vincent.grainledger.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -35,3 +43,43 @@ object MiuixShapes {
      */
     val PillShape = RoundedCornerShape(percent = 50)
 }
+
+/**
+ * 左右边缘渐变羽化遮罩修饰符 (Horizontal Fading Edge)。
+ *
+ * 为横向滑动列表/行（如分类滑轨、标签滑轨、日期轴、账户胶囊等）两端提供平滑淡出的模糊过渡，
+ * 消除选项在容器边缘被生硬直接截断的割裂感。
+ *
+ * @param fadeWidth 左右边缘羽化遮罩宽度，默认 16.dp
+ */
+fun Modifier.horizontalFadingEdge(
+    fadeWidth: Dp = 16.dp
+): Modifier = this
+    .graphicsLayer {
+        compositingStrategy = CompositingStrategy.Offscreen
+    }
+    .drawWithContent {
+        drawContent()
+        val fadeWidthPx = fadeWidth.toPx()
+        if (fadeWidthPx > 0f && size.width > fadeWidthPx * 2) {
+            // 左侧边缘平滑渐变淡出
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(Color.Transparent, Color.Black),
+                    startX = 0f,
+                    endX = fadeWidthPx
+                ),
+                blendMode = BlendMode.DstIn
+            )
+            // 右侧边缘平滑渐变淡出
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(Color.Black, Color.Transparent),
+                    startX = size.width - fadeWidthPx,
+                    endX = size.width
+                ),
+                blendMode = BlendMode.DstIn
+            )
+        }
+    }
+

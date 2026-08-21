@@ -1,7 +1,9 @@
 package com.vincent.grainledger.ui.screens.bookkeeping
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -12,15 +14,20 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -40,6 +47,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -53,6 +61,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -68,6 +78,7 @@ import com.vincent.grainledger.ui.theme.MiuixGreen
 import com.vincent.grainledger.ui.theme.MiuixOrange
 import com.vincent.grainledger.ui.theme.MiuixRed
 import com.vincent.grainledger.ui.theme.MiuixShapes
+import com.vincent.grainledger.ui.theme.horizontalFadingEdge
 import com.vincent.grainledger.ui.viewmodel.MainViewModel
 import com.vincent.grainledger.util.DateUtils
 import com.vincent.grainledger.util.MathFormulaEvaluator
@@ -81,14 +92,13 @@ import kotlin.math.absoluteValue
 /**
  * MIUIX / HyperOS 风格卡片式横向滑动分步记一笔弹窗 (BookkeepingDialog)。
  *
- * 核心创新：
+ * 核心创新与体验升级：
  * 1. 采用 HorizontalPager 分步卡片流，支持手势 1:1 左右平滑滑动与按键导航；
  * 2. 具备与月份切换一致的物理弹簧阻尼、缩放 (0.92x~1.0x) 与渐变透明度 (0.5~1.0) 动效；
- * 3. 顶部步骤指示轴与动态标题/副标题随滑动联动；
- * 4. 三大卡片专注拆分：
- *    - Step 1: 金额与实时算式评估
- *    - Step 2: 归属大类、预算信封透视（支出）或同步月份（收入），支持原地新建大类
- *    - Step 3: 记账日期（全量自选）、出资扣款账户与说明备注
+ * 3. 顶部步骤指示轴与标题无截断平滑淡入切换（SizeTransform clip=false）；
+ * 4. 三大步骤卡片高度统一固定为 370.dp，左右切换坚实无跳变；
+ * 5. 所有横向滑动区域（分类、标签、月份、日期、账户）边缘增加平滑渐变羽化模糊过渡 (horizontalFadingEdge)；
+ * 6. 记账日期 1~31 号滑轨智能居中定位当日或已选日期。
  */
 @Composable
 fun BookkeepingDialog(
@@ -96,6 +106,9 @@ fun BookkeepingDialog(
     onDismissRequest: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+
     val currentYear by viewModel.currentYear.collectAsState()
     val currentMonth by viewModel.currentMonth.collectAsState()
     val availableMonths by viewModel.availableMonths.collectAsState()
@@ -115,6 +128,24 @@ fun BookkeepingDialog(
     }
     var transactionDay by remember(defaultToday) {
         mutableIntStateOf(defaultToday)
+    }
+
+    // 记账日期居中滑轨 State
+    val dateListState = rememberLazyListState()
+
+    // 当日期改变或弹窗展示时，平滑自动居中定位到选中日期
+    LaunchedEffect(transactionDay, maxDaysInMonth) {
+        val itemWidthPx = with(density) { 40.dp.toPx() } // 34dp item + 6dp spacing
+        val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+        val dialogWidthPx = screenWidthPx * 0.94f - with(density) { 36.dp.toPx() }
+        val halfContainerPx = dialogWidthPx / 2f
+        val centerOffsetPx = (halfContainerPx - (itemWidthPx / 2f)).toInt()
+
+        val targetIndex = (transactionDay - 1).coerceIn(0, maxDaysInMonth - 1)
+        dateListState.animateScrollToItem(
+            index = targetIndex,
+            scrollOffset = -centerOffsetPx
+        )
     }
 
     val expenseCategories = remember(allCategories) { allCategories.filter { !it.isIncome } }
@@ -182,7 +213,7 @@ fun BookkeepingDialog(
                     .padding(horizontal = 18.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // ==================== 1. 顶部步骤指示轴与动态标题 ====================
+                // ==================== 1. 顶部步骤指示轴与动态标题（平滑无截断过渡） ====================
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -242,7 +273,7 @@ fun BookkeepingDialog(
                         }
                     }
 
-                    // 步骤主副标题 (动画切换)
+                    // 步骤主副标题 (动画切换，杜绝尺寸跳变与文字截断)
                     val (stepTitle, stepSubtitle) = when (pagerState.currentPage) {
                         0 -> Pair(
                             if (isIncomeMode) "记一笔收入 · 设定金额" else "记一笔支出 · 设定金额",
@@ -258,25 +289,45 @@ fun BookkeepingDialog(
                         )
                     }
 
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 44.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         AnimatedContent(
-                            targetState = stepTitle,
-                            transitionSpec = { fadeIn() togetherWith fadeOut() },
+                            targetState = Pair(stepTitle, stepSubtitle),
+                            transitionSpec = {
+                                (fadeIn(animationSpec = tween(220)) togetherWith
+                                        fadeOut(animationSpec = tween(180)))
+                                    .using(SizeTransform(clip = false))
+                            },
+                            contentAlignment = Alignment.Center,
                             label = "TitleAnimation"
-                        ) { targetTitle ->
-                            Text(
-                                text = targetTitle,
-                                fontSize = 16.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MiuixTheme.colorScheme.onSurface
-                            )
-                        }
+                        ) { (targetTitle, targetSubtitle) ->
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = targetTitle,
+                                    fontSize = 16.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MiuixTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
 
-                        Text(
-                            text = stepSubtitle,
-                            fontSize = 11.5.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceSecondary
-                        )
+                                Text(
+                                    text = targetSubtitle,
+                                    fontSize = 11.5.sp,
+                                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -580,6 +631,7 @@ fun BookkeepingDialog(
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .horizontalFadingEdge(14.dp)
                                                 .horizontalScroll(rememberScrollState()),
                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                                             verticalAlignment = Alignment.CenterVertically
@@ -666,6 +718,7 @@ fun BookkeepingDialog(
                                                 Row(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
+                                                        .horizontalFadingEdge(14.dp)
                                                         .horizontalScroll(rememberScrollState()),
                                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                 ) {
@@ -835,6 +888,7 @@ fun BookkeepingDialog(
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
+                                                    .horizontalFadingEdge(14.dp)
                                                     .horizontalScroll(rememberScrollState()),
                                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                                             ) {
@@ -911,6 +965,7 @@ fun BookkeepingDialog(
                                                     Row(
                                                         modifier = Modifier
                                                             .fillMaxWidth()
+                                                            .horizontalFadingEdge(14.dp)
                                                             .horizontalScroll(rememberScrollState()),
                                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                                     ) {
@@ -962,7 +1017,7 @@ fun BookkeepingDialog(
                                         .verticalScroll(rememberScrollState()),
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    // 1. 记账日期自选
+                                    // 1. 记账日期自选（居中定位）
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -1031,14 +1086,16 @@ fun BookkeepingDialog(
                                             }
                                         }
 
-                                        // 当月 1 ~ maxDaysInMonth 全量自选滑轨
-                                        Row(
+                                        // 当月 1 ~ maxDaysInMonth 全量自选滑轨（带两端羽化淡出 & 居中定位）
+                                        LazyRow(
+                                            state = dateListState,
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .horizontalScroll(rememberScrollState()),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                .horizontalFadingEdge(16.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            contentPadding = PaddingValues(horizontal = 8.dp)
                                         ) {
-                                            (1..maxDaysInMonth).forEach { day ->
+                                            items((1..maxDaysInMonth).toList()) { day ->
                                                 val isSelected = (transactionDay == day)
                                                 Box(
                                                     modifier = Modifier
@@ -1073,10 +1130,11 @@ fun BookkeepingDialog(
                                             modifier = Modifier.fillMaxWidth()
                                         )
 
-                                        // 常用账户快捷胶囊
+                                        // 常用账户快捷胶囊（带边缘羽化模糊）
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .horizontalFadingEdge(14.dp)
                                                 .horizontalScroll(rememberScrollState()),
                                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {

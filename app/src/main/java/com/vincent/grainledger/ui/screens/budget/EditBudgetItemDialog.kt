@@ -1,7 +1,9 @@
 package com.vincent.grainledger.ui.screens.budget
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -63,6 +66,7 @@ import com.vincent.grainledger.ui.theme.MiuixGreen
 import com.vincent.grainledger.ui.theme.MiuixOrange
 import com.vincent.grainledger.ui.theme.MiuixRed
 import com.vincent.grainledger.ui.theme.MiuixShapes
+import com.vincent.grainledger.ui.theme.horizontalFadingEdge
 import com.vincent.grainledger.util.MathFormulaEvaluator
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
@@ -74,11 +78,13 @@ import kotlin.math.absoluteValue
 /**
  * MIUIX / HyperOS 风格卡片式横向滑动加预算与编辑预算弹窗 (EditBudgetItemDialog)。
  *
- * 核心创新：
+ * 核心创新与体验升级：
  * 1. 采用 HorizontalPager 分步卡片流，支持手势 1:1 左右平滑滑动与按键导航；
  * 2. 具备与月份切换一致的物理弹簧阻尼、缩放 (0.92x~1.0x) 与渐变透明度 (0.5~1.0) 动效；
- * 3. 顶部步骤指示轴与动态标题/副标题随滑动联动；
- * 4. 三大卡片专注拆分：
+ * 3. 顶部步骤指示轴与标题无截断平滑淡入切换（SizeTransform clip=false）；
+ * 4. 三大步骤卡片高度统一固定为 370.dp，左右切换坚实无跳变；
+ * 5. 所有横向滑动区域（分类滑轨、细项推荐、账户胶囊）边缘增加平滑渐变羽化模糊过渡 (horizontalFadingEdge)；
+ * 6. 三大卡片专注拆分：
  *    - Step 1: 支出大类与预算细项（支持原地新建大类与智能高频细项推荐）
  *    - Step 2: 预算总额核算（单价算式 + 数量/月数步进微调器 + 算术工具条）
  *    - Step 3: 资金注入规划、出资扣款账户与说明备注
@@ -239,7 +245,7 @@ fun EditBudgetItemDialog(
                         }
                     }
 
-                    // 步骤主副标题 (动画切换)
+                    // 步骤主副标题 (动画切换，杜绝尺寸跳变与文字截断)
                     val (stepTitle, stepSubtitle) = when (pagerState.currentPage) {
                         0 -> Pair(
                             if (targetItem == null) "新增支出预算 · 细项归属" else "编辑支出预算 · 细项归属",
@@ -255,25 +261,45 @@ fun EditBudgetItemDialog(
                         )
                     }
 
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 44.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         AnimatedContent(
-                            targetState = stepTitle,
-                            transitionSpec = { fadeIn() togetherWith fadeOut() },
+                            targetState = Pair(stepTitle, stepSubtitle),
+                            transitionSpec = {
+                                (fadeIn(animationSpec = tween(220)) togetherWith
+                                        fadeOut(animationSpec = tween(180)))
+                                    .using(SizeTransform(clip = false))
+                            },
+                            contentAlignment = Alignment.Center,
                             label = "BudgetTitleAnimation"
-                        ) { targetTitle ->
-                            Text(
-                                text = targetTitle,
-                                fontSize = 16.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MiuixTheme.colorScheme.onSurface
-                            )
-                        }
+                        ) { (targetTitle, targetSubtitle) ->
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = targetTitle,
+                                    fontSize = 16.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MiuixTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
 
-                        Text(
-                            text = stepSubtitle,
-                            fontSize = 11.5.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceSecondary
-                        )
+                                Text(
+                                    text = targetSubtitle,
+                                    fontSize = 11.5.sp,
+                                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -317,6 +343,7 @@ fun EditBudgetItemDialog(
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .horizontalFadingEdge(14.dp)
                                                 .horizontalScroll(rememberScrollState()),
                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                                             verticalAlignment = Alignment.CenterVertically
@@ -400,6 +427,7 @@ fun EditBudgetItemDialog(
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .horizontalFadingEdge(14.dp)
                                                 .horizontalScroll(rememberScrollState()),
                                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
@@ -754,6 +782,7 @@ fun EditBudgetItemDialog(
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .horizontalFadingEdge(14.dp)
                                                 .horizontalScroll(rememberScrollState()),
                                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
