@@ -281,7 +281,8 @@ fun MainContainerScreen(
                 categoryList = allCategories,
                 onSave = { viewModel.saveBudgetItem(it) },
                 onDelete = { viewModel.deleteBudgetItem(it) },
-                onDismissRequest = { showBudgetEditDialog = false }
+                onDismissRequest = { showBudgetEditDialog = false },
+                onSaveCategory = { viewModel.saveCategory(it) }
             )
         }
 

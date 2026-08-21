@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
@@ -22,7 +21,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Icon
@@ -38,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -48,6 +45,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.vincent.grainledger.data.model.BudgetCategory
 import com.vincent.grainledger.data.model.BudgetItem
+import com.vincent.grainledger.ui.screens.category.QuickCreateCategoryDialog
 import com.vincent.grainledger.ui.theme.MiuixAnimation
 import com.vincent.grainledger.ui.theme.MiuixBlue
 import com.vincent.grainledger.ui.theme.MiuixGreen
@@ -65,7 +63,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  *
  * 核心优化：
  * 1. 纯净无边框 DialogSquircle 面板与居中标题；
- * 2. 支出大类色彩流动气泡滑轨；
+ * 2. 支出大类色彩流动气泡滑轨，支持原地一键“+ 新建分类”；
  * 3. 智能高频细项推荐标签（根据当前大类智能推荐常用项，一键填入）；
  * 4. Hero 预算总额实时核算卡片（单价格式评估 + 数量/月数步进微调器 + 快捷算术条）；
  * 5. 实际注入资金智能卡片（一键 100% 等同总额 + 注资比例透视）；
@@ -80,7 +78,8 @@ fun EditBudgetItemDialog(
     categoryList: List<BudgetCategory>,
     onSave: (BudgetItem) -> Unit,
     onDelete: (Long) -> Unit,
-    onDismissRequest: () -> Unit
+    onDismissRequest: () -> Unit,
+    onSaveCategory: ((BudgetCategory) -> Unit)? = null
 ) {
     val expenseCategories = remember(categoryList) {
         val list = categoryList.filter { !it.isIncome }
@@ -112,6 +111,7 @@ fun EditBudgetItemDialog(
     }
     var funder by remember { mutableStateOf(targetItem?.funder ?: "微信零钱") }
     var remark by remember { mutableStateOf(targetItem?.remark ?: "") }
+    var showCreateCategoryDialog by remember { mutableStateOf(false) }
 
     // 动态计算总价与注资金额
     val unitPriceEvaluated = remember(unitPriceInput) {
@@ -129,11 +129,6 @@ fun EditBudgetItemDialog(
         } else {
             totalBudgetCalculated
         }
-    }
-
-    val hasUnitPriceFormula = remember(unitPriceInput) {
-        unitPriceInput.contains("+") || unitPriceInput.contains("-") ||
-                unitPriceInput.contains("*") || unitPriceInput.contains("/")
     }
 
     // 推荐细项列表
@@ -183,7 +178,7 @@ fun EditBudgetItemDialog(
                     )
                 }
 
-                // ==================== 2. 归属支出大类选择 ====================
+                // ==================== 2. 归属支出大类选择（支持原地新建分类） ====================
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "选择支出大类",
@@ -195,7 +190,8 @@ fun EditBudgetItemDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         expenseCategories.forEach { category ->
                             val isSelected = (category.categoryName == selectedCategory)
@@ -228,6 +224,33 @@ fun EditBudgetItemDialog(
                                         color = if (isSelected) catColor else MiuixTheme.colorScheme.onSurface
                                     )
                                 }
+                            }
+                        }
+
+                        // 原地新建大类胶囊按钮
+                        Box(
+                            modifier = Modifier
+                                .clip(MiuixShapes.SmallSquircle)
+                                .background(MiuixBlue.copy(alpha = 0.12f))
+                                .clickable { showCreateCategoryDialog = true }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "新建分类",
+                                    tint = MiuixBlue,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = "新建分类",
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MiuixBlue
+                                )
                             }
                         }
                     }
@@ -699,6 +722,27 @@ fun EditBudgetItemDialog(
                         )
                     }
                 }
+            }
+
+            // 快速新建分类弹窗
+            if (showCreateCategoryDialog) {
+                QuickCreateCategoryDialog(
+                    isIncomeCategory = false,
+                    currentYear = year,
+                    currentMonth = month,
+                    onSaveCategoryWithBudget = { newCat, initialDetail, initialAmount ->
+                        onSaveCategory?.invoke(newCat)
+                        selectedCategory = newCat.categoryName
+                        if (!initialDetail.isNullOrBlank()) {
+                            detailName = initialDetail
+                        }
+                        if (initialAmount != null && initialAmount > 0) {
+                            unitPriceInput = MathFormulaEvaluator.formatAmount(initialAmount)
+                        }
+                        showCreateCategoryDialog = false
+                    },
+                    onDismissRequest = { showCreateCategoryDialog = false }
+                )
             }
         }
     }

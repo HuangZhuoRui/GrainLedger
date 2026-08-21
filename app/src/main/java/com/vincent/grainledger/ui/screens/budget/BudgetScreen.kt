@@ -136,6 +136,9 @@ fun BudgetScreen(
                     },
                     onDismissRequest = {
                         showEditDialog = false
+                    },
+                    onSaveCategory = { newCategory ->
+                        viewModel.saveCategory(newCategory)
                     }
                 )
             }
