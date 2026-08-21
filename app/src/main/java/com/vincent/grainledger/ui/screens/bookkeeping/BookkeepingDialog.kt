@@ -22,14 +22,12 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Backspace
 import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,15 +67,16 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 /**
  * MIUIX / HyperOS 风格极简记一笔弹窗 (BookkeepingDialog)。
  *
- * 核心设计：
- * 1. 沉浸式 DialogSquircle 连续超椭圆面板，带顶部胶囊指示条与极简关闭图标；
+ * 核心优化：
+ * 1. 极简优雅头部：移除顶部关闭按钮与抽拉指示条；
  * 2. 支出 / 收入 物理弹簧阻尼分段切换胶囊；
  * 3. Hero 级超大金额输入区，支持动态算式实时评估与极简算术微工具条（+、-、×、÷、C、⌫）；
  * 4. 独创“实时预算消耗预测透视卡片”，输入金额时即时演算消费后结余与动态进度条推演；
  * 5. 视觉化大类气泡与内嵌实时结余的细项胶囊；
  * 6. 收入模式快捷明细标签与多月份同步选择胶囊；
- * 7. 智能快捷日期（今天/昨天/前天）与常用账户（微信/支付宝/银行卡/现金）胶囊；
- * 8. 底部全宽沉浸式动态确认按钮。
+ * 7. 智能记账日期选择：支持当月 1~31 号全量自选 + 今天/昨天/前天 快速切换；
+ * 8. 出资/收款账户支持自由自定义输入 + 常用快捷预设点选；
+ * 9. 底部全宽沉浸式动态确认按钮。
  */
 @Composable
 fun BookkeepingDialog(
@@ -105,6 +104,7 @@ fun BookkeepingDialog(
         mutableIntStateOf(defaultToday)
     }
 
+    // 根据模式分别过滤分类
     val expenseCategories = remember(allCategories) { allCategories.filter { !it.isIncome } }
     val incomeCategories = remember(allCategories) { allCategories.filter { it.isIncome } }
 
@@ -123,6 +123,7 @@ fun BookkeepingDialog(
     var funder by remember { mutableStateOf("微信零钱") }
     var remarkText by remember { mutableStateOf("") }
 
+    // 支出模式下过滤当前大类的预算细项
     val currentCategoryExpenseItems = remember(selectedCategory, budgetItemList, isIncomeMode) {
         if (!isIncomeMode) {
             budgetItemList.filter { it.categoryName == selectedCategory }
@@ -139,6 +140,7 @@ fun BookkeepingDialog(
         selectedDetail = currentCategoryExpenseItems.first().detailName
     }
 
+    // 实时动态算式计算
     val evaluatedAmount = remember(amountInputText) {
         MathFormulaEvaluator.evaluate(amountInputText)
     }
@@ -163,54 +165,25 @@ fun BookkeepingDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 14.dp)
+                    .padding(horizontal = 18.dp, vertical = 16.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Column(
+                // ==================== 1. 顶部标题栏（已移除关闭按钮与抽拉条） ====================
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .width(36.dp)
-                            .height(4.dp)
-                            .clip(MiuixShapes.PillShape)
-                            .background(MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.25f))
+                    Text(
+                        text = if (isIncomeMode) "记一笔收入" else "记一笔支出",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MiuixTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (isIncomeMode) "记一笔收入" else "记一笔支出",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MiuixTheme.colorScheme.onSurface
-                        )
-
-                        IconButton(
-                            onClick = onDismissRequest,
-                            modifier = Modifier
-                                .size(28.dp)
-                                .background(
-                                    MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
-                                    CircleShape
-                                )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "关闭",
-                                tint = MiuixTheme.colorScheme.onSurfaceSecondary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
                 }
 
+                // ==================== 2. 支出 / 收入 物理弹簧分段胶囊 ====================
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -219,6 +192,7 @@ fun BookkeepingDialog(
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    // 支出 Tab
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -259,6 +233,7 @@ fun BookkeepingDialog(
                         }
                     }
 
+                    // 收入 Tab
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -299,6 +274,7 @@ fun BookkeepingDialog(
                     }
                 }
 
+                // ==================== 3. Hero 金额输入与实时计算区 ====================
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     cornerRadius = 20.dp
@@ -338,6 +314,7 @@ fun BookkeepingDialog(
                             }
                         }
 
+                        // 大字号输入框与货币符号
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.Bottom
@@ -375,6 +352,7 @@ fun BookkeepingDialog(
                             )
                         }
 
+                        // 快捷算术微工具条 (+, -, ×, ÷, C, ⌫)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -411,6 +389,7 @@ fun BookkeepingDialog(
                                 }
                             }
 
+                            // 清空 C
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
@@ -428,6 +407,7 @@ fun BookkeepingDialog(
                                 )
                             }
 
+                            // 退格 ⌫
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
@@ -442,7 +422,7 @@ fun BookkeepingDialog(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Backspace,
+                                    imageVector = Icons.AutoMirrored.Filled.Backspace,
                                     contentDescription = "退格",
                                     tint = MiuixTheme.colorScheme.onSurfaceSecondary,
                                     modifier = Modifier.size(14.dp)
@@ -452,6 +432,7 @@ fun BookkeepingDialog(
                     }
                 }
 
+                // ==================== 4. 【支出】实时预算消耗预测透视卡片 ====================
                 if (!isIncomeMode && matchedBudgetItem != null) {
                     val currentAllocated = matchedBudgetItem.actualAllocated
                     val currentSpent = matchedBudgetItem.actualSpent
@@ -508,6 +489,7 @@ fun BookkeepingDialog(
                                 )
                             }
 
+                            // 进度条
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -524,6 +506,7 @@ fun BookkeepingDialog(
                                 )
                             }
 
+                            // 消费前后结余演变
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -546,6 +529,7 @@ fun BookkeepingDialog(
                     }
                 }
 
+                // ==================== 4. 【收入】同步入账月份选择器 ====================
                 if (isIncomeMode) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -595,6 +579,7 @@ fun BookkeepingDialog(
                                 }
                             }
 
+                            // 月份横向胶囊单选/多选列表
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -638,6 +623,7 @@ fun BookkeepingDialog(
                     }
                 }
 
+                // ==================== 5. 大类与细项选择器 ====================
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = if (isIncomeMode) "选择收入类别" else "选择支出类别与预算信封",
@@ -646,6 +632,7 @@ fun BookkeepingDialog(
                         color = MiuixTheme.colorScheme.onSurfaceSecondary
                     )
 
+                    // 大类横向滑动胶囊
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -692,6 +679,7 @@ fun BookkeepingDialog(
                         }
                     }
 
+                    // 【支出】细项选择胶囊（内嵌当前实时结余）
                     if (!isIncomeMode && currentCategoryExpenseItems.isNotEmpty()) {
                         Row(
                             modifier = Modifier
@@ -775,87 +763,113 @@ fun BookkeepingDialog(
                     }
                 }
 
-                // ==================== 6. 快捷属性栏（日期 + 账户 + 备注） ====================
+                // ==================== 6. 快捷属性栏（自选日期 + 自定义账户 + 备注） ====================
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // 日期快捷选择
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    // 1. 日期全量自选组件（支持自选 1~31 号及今天/昨天/前天快捷定位）
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CalendarToday,
-                                contentDescription = null,
-                                tint = MiuixTheme.colorScheme.onSurfaceSecondary,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Text(
-                                text = "记账日期: ${currentMonth}月${transactionDay}日",
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MiuixTheme.colorScheme.onSurface
-                            )
-                        }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarToday,
+                                    contentDescription = null,
+                                    tint = MiuixTheme.colorScheme.onSurfaceSecondary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = "记账日期: ${currentYear}年${currentMonth}月${transactionDay}日",
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MiuixTheme.colorScheme.onSurface
+                                )
+                            }
 
-                        // 快捷今天/昨天/前天
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            listOf(
-                                "今天" to defaultToday,
-                                "昨天" to (defaultToday - 1).coerceAtLeast(1),
-                                "前天" to (defaultToday - 2).coerceAtLeast(1)
-                            ).forEach { (label, dayVal) ->
-                                val isSelected = (transactionDay == dayVal)
-                                Box(
-                                    modifier = Modifier
-                                        .clip(MiuixShapes.PillShape)
-                                        .background(
-                                            if (isSelected) activeThemeColor.copy(alpha = 0.15f) else MiuixTheme.colorScheme.surfaceVariant
+                            // 快捷今天/昨天/前天快速定位
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                listOf(
+                                    "今天" to defaultToday,
+                                    "昨天" to (defaultToday - 1).coerceAtLeast(1),
+                                    "前天" to (defaultToday - 2).coerceAtLeast(1)
+                                ).forEach { (label, dayVal) ->
+                                    val isSelected = (transactionDay == dayVal)
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(MiuixShapes.PillShape)
+                                            .background(
+                                                if (isSelected) activeThemeColor.copy(alpha = 0.15f) else MiuixTheme.colorScheme.surfaceVariant
+                                            )
+                                            .clickable { transactionDay = dayVal }
+                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) activeThemeColor else MiuixTheme.colorScheme.onSurfaceSecondary
                                         )
-                                        .clickable { transactionDay = dayVal }
-                                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 11.5.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) activeThemeColor else MiuixTheme.colorScheme.onSurfaceSecondary
-                                    )
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    // 常用出资/收款账户快捷选择
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AccountBalanceWallet,
-                                contentDescription = null,
-                                tint = MiuixTheme.colorScheme.onSurfaceSecondary,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Text(
-                                text = if (isIncomeMode) "收款账户: $funder" else "出资账户: $funder",
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MiuixTheme.colorScheme.onSurface
-                            )
-                        }
-
+                        // 当月全量 1 ~ maxDaysInMonth 日期横向滚动自选滑轨
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            listOf("微信零钱", "支付宝", "招商银行卡", "现金", "建设银行", "工商银行").forEach { acc ->
+                            for (day in 1..maxDaysInMonth) {
+                                val isSelected = (day == transactionDay)
+                                val isToday = (day == defaultToday)
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(MiuixShapes.SmallSquircle)
+                                        .background(
+                                            if (isSelected) activeThemeColor.copy(alpha = 0.18f) else MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                        )
+                                        .clickable { transactionDay = day }
+                                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${day}日${if (isToday) "•" else ""}",
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) activeThemeColor else MiuixTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. 出资/收款账户支持自定义输入 + 常用快捷标签点选
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        OutlinedTextField(
+                            value = funder,
+                            onValueChange = { funder = it },
+                            label = { Text(text = if (isIncomeMode) "收款账户 (支持直接输入或点选下方预设)" else "出资扣款账户 (支持直接输入或点选下方预设)") },
+                            placeholder = { Text("例如：微信零钱、招商银行卡、美团月付、支付宝") },
+                            singleLine = true,
+                            shape = MiuixShapes.MediumSquircle,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        // 常用账户快捷点选胶囊
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf("微信零钱", "支付宝", "招商银行卡", "现金", "建设银行", "工商银行", "京东白条", "花呗").forEach { acc ->
                                 val isSelected = (funder == acc)
                                 Box(
                                     modifier = Modifier
@@ -877,7 +891,7 @@ fun BookkeepingDialog(
                         }
                     }
 
-                    // 备注输入框
+                    // 3. 备注说明输入框
                     OutlinedTextField(
                         value = remarkText,
                         onValueChange = { remarkText = it },
@@ -900,54 +914,71 @@ fun BookkeepingDialog(
                     "记一笔支出 $actionAmountString"
                 }
 
-                Button(
-                    onClick = {
-                        if (evaluatedAmount > 0.0) {
-                            val finalDetail = if (isIncomeMode) {
-                                if (incomeDetailInput.isNotBlank()) incomeDetailInput.trim() else "日常入账"
-                            } else {
-                                if (selectedDetail.isNotEmpty()) selectedDetail else "日常支出"
-                            }
-
-                            if (isIncomeMode) {
-                                val targetMonthsList = selectedTargetMonths.toList()
-                                viewModel.recordTransactionsMultiMonths(
-                                    targetMonths = targetMonthsList,
-                                    day = transactionDay,
-                                    categoryName = selectedCategory,
-                                    detailName = finalDetail,
-                                    amount = evaluatedAmount,
-                                    funder = funder,
-                                    remark = remarkText
-                                )
-                            } else {
-                                viewModel.recordTransaction(
-                                    year = currentYear,
-                                    month = currentMonth,
-                                    day = transactionDay,
-                                    categoryName = selectedCategory,
-                                    detailName = finalDetail,
-                                    amount = -evaluatedAmount,
-                                    funder = funder,
-                                    remark = remarkText
-                                )
-                            }
-                            onDismissRequest()
-                        }
-                    },
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        color = if (evaluatedAmount > 0.0) activeThemeColor else MiuixTheme.colorScheme.surfaceVariant
-                    )
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text(
-                        text = buttonText,
-                        color = if (evaluatedAmount > 0.0) Color.White else MiuixTheme.colorScheme.onSurfaceSecondary,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Button(
+                        onClick = onDismissRequest,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(color = MiuixTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Text(text = "取消", color = MiuixTheme.colorScheme.onSurface, fontSize = 14.sp)
+                    }
+
+                    Button(
+                        onClick = {
+                            if (evaluatedAmount > 0.0) {
+                                val finalDetail = if (isIncomeMode) {
+                                    if (incomeDetailInput.isNotBlank()) incomeDetailInput.trim() else "日常入账"
+                                } else {
+                                    if (selectedDetail.isNotEmpty()) selectedDetail else "日常支出"
+                                }
+
+                                if (isIncomeMode) {
+                                    val targetMonthsList = selectedTargetMonths.toList()
+                                    viewModel.recordTransactionsMultiMonths(
+                                        targetMonths = targetMonthsList,
+                                        day = transactionDay,
+                                        categoryName = selectedCategory,
+                                        detailName = finalDetail,
+                                        amount = evaluatedAmount,
+                                        funder = funder,
+                                        remark = remarkText
+                                    )
+                                } else {
+                                    viewModel.recordTransaction(
+                                        year = currentYear,
+                                        month = currentMonth,
+                                        day = transactionDay,
+                                        categoryName = selectedCategory,
+                                        detailName = finalDetail,
+                                        amount = -evaluatedAmount,
+                                        funder = funder,
+                                        remark = remarkText
+                                    )
+                                }
+                                onDismissRequest()
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(2f)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            color = if (evaluatedAmount > 0.0) activeThemeColor else MiuixTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Text(
+                            text = buttonText,
+                            color = if (evaluatedAmount > 0.0) Color.White else MiuixTheme.colorScheme.onSurfaceSecondary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
