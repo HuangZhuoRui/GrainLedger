@@ -83,3 +83,55 @@ fun Modifier.horizontalFadingEdge(
         }
     }
 
+/**
+ * 垂直顶部/底部边缘平滑渐变羽化遮罩修饰符 (Vertical Fading Edge)。
+ *
+ * 为纵向滑动列表（如检查更新页面、设置二级页等）顶部或底部提供平滑淡出的模糊过渡，
+ * 消除卡片在向上滑入标题栏/顶部Tab时直接被生硬截断的割裂感。
+ *
+ * @param topFadeHeight 顶部边缘羽化遮罩高度，默认 16.dp
+ * @param bottomFadeHeight 底部边缘羽化遮罩高度，默认 0.dp
+ */
+fun Modifier.verticalFadingEdge(
+    topFadeHeight: Dp = 16.dp,
+    bottomFadeHeight: Dp = 0.dp
+): Modifier = this
+    .graphicsLayer {
+        compositingStrategy = CompositingStrategy.Offscreen
+    }
+    .drawWithContent {
+        drawContent()
+        val topFadePx = topFadeHeight.toPx()
+        val bottomFadePx = bottomFadeHeight.toPx()
+        if (topFadePx > 0f && size.height > topFadePx) {
+            // 顶部平滑渐变淡出
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.Transparent, Color.Black),
+                    startY = 0f,
+                    endY = topFadePx
+                ),
+                blendMode = BlendMode.DstIn
+            )
+        }
+        if (bottomFadePx > 0f && size.height > bottomFadePx) {
+            // 底部平滑渐变淡出
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.Black, Color.Transparent),
+                    startY = size.height - bottomFadePx,
+                    endY = size.height
+                ),
+                blendMode = BlendMode.DstIn
+            )
+        }
+    }
+
+/**
+ * 顶部边缘平滑渐变羽化遮罩修饰符。
+ */
+fun Modifier.topFadingEdge(
+    fadeHeight: Dp = 18.dp
+): Modifier = verticalFadingEdge(topFadeHeight = fadeHeight, bottomFadeHeight = 0.dp)
+
+

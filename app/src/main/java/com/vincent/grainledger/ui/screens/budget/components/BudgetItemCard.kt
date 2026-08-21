@@ -82,23 +82,49 @@ fun BudgetItemCard(
                 }
             }
 
-            Text(
-                text = if (isIncome) {
-                    if (budgetItem.quantity > 1.0) {
-                        "单价 ${MathFormulaEvaluator.formatAmount(budgetItem.unitPrice)} ¥ × ${budgetItem.quantity} = 预估 ${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)} ¥"
-                    } else {
-                        "预估收入: ${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)} ¥"
-                    }
+            val formattedQuantity = if (budgetItem.quantity % 1.0 == 0.0) budgetItem.quantity.toInt().toString() else budgetItem.quantity.toString()
+
+            if (isIncome) {
+                if (budgetItem.quantity > 1.0) {
+                    Text(
+                        text = "单价 ${MathFormulaEvaluator.formatAmount(budgetItem.unitPrice)} ¥ × $formattedQuantity",
+                        fontSize = 11.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary
+                    )
+                    Text(
+                        text = "预估收入 ${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)} ¥",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary
+                    )
                 } else {
-                    if (budgetItem.quantity > 1.0) {
-                        "单价 ${MathFormulaEvaluator.formatAmount(budgetItem.unitPrice)} ¥ × ${budgetItem.quantity} = 总价 ${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)} ¥"
-                    } else {
-                        "预算总价: ${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)} ¥"
-                    }
-                },
-                fontSize = 11.5.sp,
-                color = MiuixTheme.colorScheme.onSurfaceSecondary
-            )
+                    Text(
+                        text = "预估收入: ${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)} ¥",
+                        fontSize = 11.5.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary
+                    )
+                }
+            } else {
+                if (budgetItem.quantity > 1.0) {
+                    Text(
+                        text = "单价 ${MathFormulaEvaluator.formatAmount(budgetItem.unitPrice)} ¥ × $formattedQuantity",
+                        fontSize = 11.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary
+                    )
+                    Text(
+                        text = "预算总价 ${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)} ¥",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary
+                    )
+                } else {
+                    Text(
+                        text = "预算总价: ${MathFormulaEvaluator.formatAmount(budgetItem.totalPrice)} ¥",
+                        fontSize = 11.5.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary
+                    )
+                }
+            }
         }
 
         Row(

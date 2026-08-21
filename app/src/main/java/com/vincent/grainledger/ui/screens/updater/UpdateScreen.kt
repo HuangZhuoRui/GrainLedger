@@ -29,6 +29,7 @@ import com.vincent.grainledger.ui.components.layout.SectionHeader
 import com.vincent.grainledger.ui.screens.updater.components.CurrentVersionCard
 import com.vincent.grainledger.ui.screens.updater.components.ReleaseHistoryCard
 import com.vincent.grainledger.ui.theme.MiuixBlue
+import com.vincent.grainledger.ui.theme.topFadingEdge
 import com.vincent.grainledger.ui.viewmodel.MainViewModel
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -71,8 +72,10 @@ fun UpdateScreen(
         applyNavigationBarPadding = true
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .topFadingEdge(20.dp),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // 1. 当前版本与检查卡片
