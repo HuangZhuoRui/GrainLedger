@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -279,10 +280,12 @@ fun BookkeepingDialog(
                     }
                 }
 
-                // ==================== 2. 中部 HorizontalPager (物理阻尼与缩放) ====================
+                // ==================== 2. 中部 HorizontalPager (固定统一高度 370.dp，彻底消除高度跳动) ====================
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(370.dp)
                 ) { page ->
                     val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction).absoluteValue
                     val scale = 1f - (pageOffset * 0.08f).coerceIn(0f, 0.08f)
@@ -290,7 +293,7 @@ fun BookkeepingDialog(
 
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .fillMaxSize()
                             .graphicsLayer {
                                 scaleX = scale
                                 scaleY = scale
@@ -302,7 +305,7 @@ fun BookkeepingDialog(
                             0 -> {
                                 Column(
                                     modifier = Modifier
-                                        .fillMaxWidth()
+                                        .fillMaxSize()
                                         .verticalScroll(rememberScrollState()),
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
@@ -561,7 +564,7 @@ fun BookkeepingDialog(
                             1 -> {
                                 Column(
                                     modifier = Modifier
-                                        .fillMaxWidth()
+                                        .fillMaxSize()
                                         .verticalScroll(rememberScrollState()),
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
@@ -955,7 +958,7 @@ fun BookkeepingDialog(
                             2 -> {
                                 Column(
                                     modifier = Modifier
-                                        .fillMaxWidth()
+                                        .fillMaxSize()
                                         .verticalScroll(rememberScrollState()),
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
