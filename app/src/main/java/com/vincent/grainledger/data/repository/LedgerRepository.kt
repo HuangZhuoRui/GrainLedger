@@ -9,6 +9,7 @@ import com.vincent.grainledger.data.model.CategoryOverview
 import com.vincent.grainledger.data.model.IncomeCategoryOverview
 import com.vincent.grainledger.data.model.MonthlyOverview
 import com.vincent.grainledger.data.model.TransactionRecord
+import com.vincent.grainledger.util.DateUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -354,6 +355,83 @@ class LedgerRepository(context: Context) {
     }
 
     /**
+     * 批量新增记账流水（支持选择同步至指定的多个目标月份）。
+     */
+    suspend fun recordTransactionsMultiMonths(
+        targetMonths: List<Pair<Int, Int>>,
+        day: Int,
+        categoryName: String,
+        detailName: String,
+        amount: Double,
+        funder: String,
+        remark: String
+    ) = withContext(Dispatchers.IO) {
+        if (targetMonths.isEmpty()) return@withContext
+
+        database.runInTransaction { db ->
+            for (monthPair in targetMonths) {
+                val (tYear, tMonth) = monthPair
+                val maxDay = DateUtils.getDaysInMonth(tYear, tMonth)
+                val clampedDay = day.coerceIn(1, maxDay)
+
+                val isIncome = amount > 0
+                val computedItemRemaining: Double
+                val computedCategoryRemaining: Double
+
+                if (isIncome) {
+                    val curTrans = transactionDao.getTransactionsByMonth(tYear, tMonth, db)
+                    val curCatIncome = curTrans.filter { it.categoryName == categoryName && it.amount > 0 }.sumOf { it.amount }
+                    computedItemRemaining = amount
+                    computedCategoryRemaining = curCatIncome + amount
+                } else {
+                    val expenseAmount = kotlin.math.abs(amount)
+                    val existingItem = budgetItemDao.findBudgetItem(
+                        tYear,
+                        tMonth,
+                        categoryName,
+                        detailName,
+                        db
+                    )
+                    if (existingItem != null) {
+                        val newSpent = existingItem.actualSpent + expenseAmount
+                        val newBalance = existingItem.actualAllocated - newSpent
+                        budgetItemDao.updateSpentAndBalance(existingItem.itemId, newSpent, newBalance, db)
+                        computedItemRemaining = newBalance
+                    } else {
+                        computedItemRemaining = -expenseAmount
+                    }
+                    val categoryItems = budgetItemDao.getBudgetItemsByMonth(tYear, tMonth, db)
+                        .filter { it.categoryName == categoryName }
+                    val totalAllocated = categoryItems.sumOf { it.actualAllocated }
+                    val totalSpent = categoryItems.sumOf { it.actualSpent } + (if (existingItem == null) expenseAmount else 0.0)
+                    computedCategoryRemaining = totalAllocated - totalSpent
+                }
+
+                val record = TransactionRecord(
+                    recordId = 0L,
+                    year = tYear,
+                    month = tMonth,
+                    day = clampedDay,
+                    categoryName = categoryName,
+                    detailName = detailName,
+                    amount = amount,
+                    itemRemaining = computedItemRemaining,
+                    categoryRemaining = computedCategoryRemaining,
+                    funder = funder,
+                    remark = remark,
+                    timestamp = System.currentTimeMillis()
+                )
+                transactionDao.insertTransaction(record, db)
+            }
+        }
+
+        targetMonths.forEach { (tYear, tMonth) ->
+            invalidateMonthAndFuture(tYear, tMonth)
+        }
+        notifyDataChanged()
+    }
+
+    /**
      * 删除一笔交易流水，并在数据库事务中自动反算回补细项与大类的剩余金额。
      */
     suspend fun deleteTransaction(record: TransactionRecord): Boolean = withContext(Dispatchers.IO) {
@@ -510,18 +588,22 @@ class LedgerRepository(context: Context) {
             )
         }.sortedBy { categoryMap[it.categoryName]?.sortOrder ?: 99 }
 
-        // 6. 按收入大类聚合入账概览（显示在看板页面）
+        // 6. 按收入大类聚合入账概览（仅呈现当月存在实际入账流水的分类，避免空类污染全量月份）
         val incomeCategories = allCats.filter { it.isIncome }
         val incomeGroupMap = incomeTransactions.groupBy { it.categoryName }
-        val incomeOverviewList = incomeCategories.map { cat ->
+        val incomeOverviewList = incomeCategories.mapNotNull { cat ->
             val transList = incomeGroupMap[cat.categoryName] ?: emptyList()
-            val sum = BigDecimal(transList.sumOf { it.amount }).setScale(2, RoundingMode.HALF_UP).toDouble()
-            IncomeCategoryOverview(
-                categoryName = cat.categoryName,
-                totalIncome = sum,
-                transactionCount = transList.size,
-                transactionList = transList
-            )
+            if (transList.isEmpty()) {
+                null
+            } else {
+                val sum = BigDecimal(transList.sumOf { it.amount }).setScale(2, RoundingMode.HALF_UP).toDouble()
+                IncomeCategoryOverview(
+                    categoryName = cat.categoryName,
+                    totalIncome = sum,
+                    transactionCount = transList.size,
+                    transactionList = transList
+                )
+            }
         }.sortedBy { categoryMap[it.categoryName]?.sortOrder ?: 99 }
 
         return MonthlyOverview(

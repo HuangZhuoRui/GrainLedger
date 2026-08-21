@@ -15,10 +15,10 @@ class BudgetItemDao(private val database: GrainLedgerDatabase) {
     /**
      * 获取指定年月的所有预算项列表。
      */
-    fun getBudgetItemsByMonth(year: Int, month: Int): List<BudgetItem> {
+    fun getBudgetItemsByMonth(year: Int, month: Int, db: SQLiteDatabase? = null): List<BudgetItem> {
         val resultList = mutableListOf<BudgetItem>()
-        val db = database.readableDatabase
-        val cursor = db.query(
+        val targetDb = db ?: database.readableDatabase
+        val cursor = targetDb.query(
             GrainLedgerDatabase.TABLE_BUDGET_ITEMS,
             null,
             "${GrainLedgerDatabase.COL_BUDGET_YEAR} = ? AND ${GrainLedgerDatabase.COL_BUDGET_MONTH} = ?",

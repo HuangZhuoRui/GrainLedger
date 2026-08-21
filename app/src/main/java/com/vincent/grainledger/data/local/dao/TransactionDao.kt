@@ -15,10 +15,10 @@ class TransactionDao(private val database: GrainLedgerDatabase) {
     /**
      * 获取指定年月的全部交易流水记录（按日期与主键降序排列）。
      */
-    fun getTransactionsByMonth(year: Int, month: Int): List<TransactionRecord> {
+    fun getTransactionsByMonth(year: Int, month: Int, db: SQLiteDatabase? = null): List<TransactionRecord> {
         val resultList = mutableListOf<TransactionRecord>()
-        val db = database.readableDatabase
-        val cursor = db.query(
+        val targetDb = db ?: database.readableDatabase
+        val cursor = targetDb.query(
             GrainLedgerDatabase.TABLE_TRANSACTIONS,
             null,
             "${GrainLedgerDatabase.COL_TRANS_YEAR} = ? AND ${GrainLedgerDatabase.COL_TRANS_MONTH} = ?",

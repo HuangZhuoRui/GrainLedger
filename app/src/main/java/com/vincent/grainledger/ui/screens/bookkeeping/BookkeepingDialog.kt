@@ -68,10 +68,14 @@ fun BookkeepingDialog(
 ) {
     val currentYear by viewModel.currentYear.collectAsState()
     val currentMonth by viewModel.currentMonth.collectAsState()
+    val availableMonths by viewModel.availableMonths.collectAsState()
     val budgetItemList by viewModel.currentBudgetItems.collectAsState()
     val allCategories by viewModel.allCategories.collectAsState()
 
     var isIncomeMode by remember { mutableStateOf(false) }
+    var selectedTargetMonths by remember(currentYear, currentMonth) {
+        mutableStateOf(setOf(Pair(currentYear, currentMonth)))
+    }
     var transactionDay by remember {
         mutableIntStateOf(
             DateUtils.getCurrentDay().coerceIn(1, DateUtils.getDaysInMonth(currentYear, currentMonth))
@@ -429,7 +433,95 @@ fun BookkeepingDialog(
                     }
                 }
 
-                // 5. 账户与渠道
+                // 5. 同步入账月份选择（仅在记收入模式下展示，默认仅当前月，支持自由多选同步）
+                if (isIncomeMode) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "同步入账月份 (已选 ${selectedTargetMonths.size} 个月)",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MiuixTheme.colorScheme.onSurface
+                            )
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                TextButton(
+                                    onClick = {
+                                        selectedTargetMonths = setOf(Pair(currentYear, currentMonth))
+                                    }
+                                ) {
+                                    Text(
+                                        text = "仅当月",
+                                        fontSize = 11.5.sp,
+                                        color = MiuixGreen
+                                    )
+                                }
+                                TextButton(
+                                    onClick = {
+                                        selectedTargetMonths = if (selectedTargetMonths.size == availableMonths.size) {
+                                            setOf(Pair(currentYear, currentMonth))
+                                        } else {
+                                            availableMonths.toSet()
+                                        }
+                                    }
+                                ) {
+                                    Text(
+                                        text = if (selectedTargetMonths.size == availableMonths.size) "取消全选" else "全选",
+                                        fontSize = 11.5.sp,
+                                        color = MiuixGreen
+                                    )
+                                }
+                            }
+                        }
+
+                        // 月份横向胶囊单选/多选列表
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            availableMonths.forEach { (mYear, mMonth) ->
+                                val monthPair = Pair(mYear, mMonth)
+                                val isSelected = selectedTargetMonths.contains(monthPair)
+                                val isCurrent = (mYear == currentYear && mMonth == currentMonth)
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(MiuixShapes.SmallSquircle)
+                                        .background(
+                                            if (isSelected) MiuixGreen.copy(alpha = 0.18f) else MiuixTheme.colorScheme.surfaceVariant
+                                        )
+                                        .clickable {
+                                            selectedTargetMonths = if (isSelected) {
+                                                if (selectedTargetMonths.size > 1) {
+                                                    selectedTargetMonths - monthPair
+                                                } else {
+                                                    selectedTargetMonths
+                                                }
+                                            } else {
+                                                selectedTargetMonths + monthPair
+                                            }
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = "${mYear}年${mMonth}月${if (isCurrent) " (当月)" else ""}",
+                                        fontSize = 12.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MiuixGreen else MiuixTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 6. 账户与渠道
                 OutlinedTextField(
                     value = funder,
                     onValueChange = { funder = it },
@@ -439,7 +531,7 @@ fun BookkeepingDialog(
                     singleLine = true
                 )
 
-                // 6. 备注说明
+                // 7. 备注说明
                 OutlinedTextField(
                     value = remarkText,
                     onValueChange = { remarkText = it },
@@ -449,7 +541,7 @@ fun BookkeepingDialog(
                     singleLine = true
                 )
 
-                // 7. 底部确认按钮
+                // 8. 底部确认按钮
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -473,17 +565,30 @@ fun BookkeepingDialog(
                                 } else {
                                     if (selectedDetail.isNotEmpty()) selectedDetail else "日常支出"
                                 }
-                                val finalAmount = if (isIncomeMode) evaluatedAmount else -evaluatedAmount
-                                viewModel.recordTransaction(
-                                    year = currentYear,
-                                    month = currentMonth,
-                                    day = transactionDay,
-                                    categoryName = selectedCategory,
-                                    detailName = finalDetail,
-                                    amount = finalAmount,
-                                    funder = funder,
-                                    remark = remarkText
-                                )
+
+                                if (isIncomeMode) {
+                                    val targetMonthsList = selectedTargetMonths.toList()
+                                    viewModel.recordTransactionsMultiMonths(
+                                        targetMonths = targetMonthsList,
+                                        day = transactionDay,
+                                        categoryName = selectedCategory,
+                                        detailName = finalDetail,
+                                        amount = evaluatedAmount,
+                                        funder = funder,
+                                        remark = remarkText
+                                    )
+                                } else {
+                                    viewModel.recordTransaction(
+                                        year = currentYear,
+                                        month = currentMonth,
+                                        day = transactionDay,
+                                        categoryName = selectedCategory,
+                                        detailName = finalDetail,
+                                        amount = -evaluatedAmount,
+                                        funder = funder,
+                                        remark = remarkText
+                                    )
+                                }
                                 onDismissRequest()
                             }
                         },

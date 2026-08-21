@@ -217,6 +217,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * 批量新增记账流水（支持选择同步至指定的多个目标月份）。
+     */
+    fun recordTransactionsMultiMonths(
+        targetMonths: List<Pair<Int, Int>>,
+        day: Int,
+        categoryName: String,
+        detailName: String,
+        amount: Double,
+        funder: String,
+        remark: String
+    ) {
+        viewModelScope.launch {
+            repository.recordTransactionsMultiMonths(
+                targetMonths = targetMonths,
+                day = day,
+                categoryName = categoryName,
+                detailName = detailName,
+                amount = amount,
+                funder = funder,
+                remark = remark
+            )
+            _toastMessage.value = if (targetMonths.size > 1) {
+                "已成功同步记入 ${targetMonths.size} 个月份！"
+            } else {
+                "记账成功！已实时更新细项与大类结余"
+            }
+        }
+    }
+
+    /**
      * 删除指定交易流水。
      */
     fun deleteTransaction(recordId: Long) {

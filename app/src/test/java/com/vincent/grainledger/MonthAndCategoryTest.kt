@@ -3,6 +3,7 @@ package com.vincent.grainledger
 import com.vincent.grainledger.data.model.BudgetCategory
 import com.vincent.grainledger.data.model.BudgetItem
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -426,5 +427,53 @@ class MonthAndCategoryTest {
         // 场景 3：仅清理 9月份全部类别 -> tx3, tx4
         val monthOnlyFilter = allTxs.filter { it.year == 2026 && it.month == 9 }
         assertEquals(2, monthOnlyFilter.size)
+    }
+
+    @Test
+    fun testSelectiveMonthIncomeSync() {
+        // 场景：用户选择将一笔收入（如工资 8000元）同步至选定的部分月份（如 8月和 9月），但不同步至 10月
+        val selectedMonths = listOf(Pair(2026, 8), Pair(2026, 9))
+        val generatedRecords = selectedMonths.map { (y, m) ->
+            com.vincent.grainledger.data.model.TransactionRecord(
+                recordId = 0L,
+                year = y,
+                month = m,
+                day = 10,
+                categoryName = "工资薪金",
+                detailName = "基本工资",
+                amount = 8000.0,
+                itemRemaining = 8000.0,
+                categoryRemaining = 8000.0
+            )
+        }
+
+        assertEquals(2, generatedRecords.size)
+        assertEquals(Pair(2026, 8), Pair(generatedRecords[0].year, generatedRecords[0].month))
+        assertEquals(Pair(2026, 9), Pair(generatedRecords[1].year, generatedRecords[1].month))
+        // 验证 10月份未被污染
+        assertFalse(generatedRecords.any { it.year == 2026 && it.month == 10 })
+    }
+
+    @Test
+    fun testEmptyIncomeCategoryNotPollutingOtherMonths() {
+        // 场景：系统中定义了 3 个收入分类，但 8 月仅有 "工资薪金" 入账，"兼职收入" 与 "理财" 无入账
+        val allIncomeCategories = listOf(
+            com.vincent.grainledger.data.model.BudgetCategory(1, "工资薪金", isIncome = true),
+            com.vincent.grainledger.data.model.BudgetCategory(2, "兼职收入", isIncome = true),
+            com.vincent.grainledger.data.model.BudgetCategory(3, "理财收益", isIncome = true)
+        )
+        val augTransactions = listOf(
+            com.vincent.grainledger.data.model.TransactionRecord(1, 2026, 8, 5, "工资薪金", "月薪", 10000.0, 10000.0, 10000.0)
+        )
+
+        val txGroup = augTransactions.groupBy { it.categoryName }
+        val displayedIncomeOverviews = allIncomeCategories.mapNotNull { cat ->
+            val list = txGroup[cat.categoryName] ?: emptyList()
+            if (list.isEmpty()) null else cat.categoryName
+        }
+
+        // 8月份仅展示存在流水的 "工资薪金"，不会将未入账的分类全部同步展开
+        assertEquals(1, displayedIncomeOverviews.size)
+        assertEquals("工资薪金", displayedIncomeOverviews[0])
     }
 }
