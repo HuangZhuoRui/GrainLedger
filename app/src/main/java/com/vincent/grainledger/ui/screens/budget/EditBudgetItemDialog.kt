@@ -2,10 +2,13 @@ package com.vincent.grainledger.ui.screens.budget
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -81,7 +84,7 @@ import kotlin.math.absoluteValue
  * 核心创新与体验升级：
  * 1. 采用 HorizontalPager 分步卡片流，支持手势 1:1 左右平滑滑动与按键导航；
  * 2. 具备与月份切换一致的物理弹簧阻尼、缩放 (0.92x~1.0x) 与渐变透明度 (0.5~1.0) 动效；
- * 3. 顶部步骤指示轴与标题无截断平滑淡入切换（SizeTransform clip=false）；
+ * 3. 顶部步骤指示轴与标题采用物理缩放 (Scale + Fade) 联动过渡（SizeTransform clip=false）；
  * 4. 三大步骤卡片高度统一固定为 370.dp，左右切换坚实无跳变；
  * 5. 所有横向滑动区域（分类滑轨、细项推荐、账户胶囊）边缘增加平滑渐变羽化模糊过渡 (horizontalFadingEdge)；
  * 6. 三大卡片专注拆分：
@@ -185,37 +188,56 @@ fun EditBudgetItemDialog(
                     .padding(horizontal = 18.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // ==================== 1. 顶部步骤指示轴与动态标题 ====================
+                // ==================== 1. 顶部步骤指示轴与动态标题（物理缩放过渡） ====================
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // 步骤指示胶囊条 (1 / 2 / 3)
+                    // 步骤指示胶囊条 (1 / 2 / 3) 带物理弹性缩放与平滑过渡
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         listOf("1 细项", "2 核算", "3 注资").forEachIndexed { index, title ->
                             val isCurrent = (pagerState.currentPage == index)
                             val isCompleted = (pagerState.currentPage > index)
 
+                            val pillScale by animateFloatAsState(
+                                targetValue = if (isCurrent) 1.08f else 0.94f,
+                                animationSpec = MiuixAnimation.springBouncy(),
+                                label = "BudgetPillScale"
+                            )
+                            val pillAlpha by animateFloatAsState(
+                                targetValue = if (isCurrent) 1f else if (isCompleted) 0.85f else 0.55f,
+                                animationSpec = MiuixAnimation.springSmooth(),
+                                label = "BudgetPillAlpha"
+                            )
+                            val pillBgColor by animateColorAsState(
+                                targetValue = when {
+                                    isCurrent -> MiuixBlue
+                                    isCompleted -> MiuixBlue.copy(alpha = 0.22f)
+                                    else -> MiuixTheme.colorScheme.surfaceVariant
+                                },
+                                animationSpec = tween(220),
+                                label = "BudgetPillBg"
+                            )
+
                             Box(
                                 modifier = Modifier
+                                    .graphicsLayer {
+                                        scaleX = pillScale
+                                        scaleY = pillScale
+                                        this.alpha = pillAlpha
+                                    }
                                     .clip(MiuixShapes.PillShape)
-                                    .background(
-                                        when {
-                                            isCurrent -> MiuixBlue
-                                            isCompleted -> MiuixBlue.copy(alpha = 0.25f)
-                                            else -> MiuixTheme.colorScheme.surfaceVariant
-                                        }
-                                    )
+                                    .background(pillBgColor)
                                     .clickable {
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(index, animationSpec = MiuixAnimation.springSmooth())
                                         }
                                     }
-                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                                    .padding(horizontal = 12.dp, vertical = 4.5.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Row(
@@ -245,7 +267,7 @@ fun EditBudgetItemDialog(
                         }
                     }
 
-                    // 步骤主副标题 (动画切换，杜绝尺寸跳变与文字截断)
+                    // 步骤主副标题 (3D 缩放 + 淡入淡出动画，杜绝生硬与文字截断)
                     val (stepTitle, stepSubtitle) = when (pagerState.currentPage) {
                         0 -> Pair(
                             if (targetItem == null) "新增支出预算 · 细项归属" else "编辑支出预算 · 细项归属",
@@ -268,15 +290,23 @@ fun EditBudgetItemDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         AnimatedContent(
-                            targetState = Pair(stepTitle, stepSubtitle),
+                            targetState = Triple(pagerState.currentPage, stepTitle, stepSubtitle),
                             transitionSpec = {
-                                (fadeIn(animationSpec = tween(220)) togetherWith
-                                        fadeOut(animationSpec = tween(180)))
-                                    .using(SizeTransform(clip = false))
+                                val isForward = targetState.first >= initialState.first
+                                (
+                                    (scaleIn(
+                                        initialScale = if (isForward) 0.85f else 1.15f,
+                                        animationSpec = tween(240, easing = MiuixAnimation.MiuixDecelerateEasing)
+                                    ) + fadeIn(animationSpec = tween(220))) togetherWith
+                                    (scaleOut(
+                                        targetScale = if (isForward) 1.15f else 0.85f,
+                                        animationSpec = tween(180, easing = MiuixAnimation.MiuixFluidEasing)
+                                    ) + fadeOut(animationSpec = tween(180)))
+                                ).using(SizeTransform(clip = false))
                             },
                             contentAlignment = Alignment.Center,
-                            label = "BudgetTitleAnimation"
-                        ) { (targetTitle, targetSubtitle) ->
+                            label = "BudgetTitleScaleAnimation"
+                        ) { (_, targetTitle, targetSubtitle) ->
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalAlignment = Alignment.CenterHorizontally
