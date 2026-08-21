@@ -37,6 +37,7 @@ import com.vincent.grainledger.data.model.TransactionRecord
 import com.vincent.grainledger.ui.components.dialog.ConfirmDialog
 import com.vincent.grainledger.ui.components.feedback.EmptyStateView
 import com.vincent.grainledger.ui.components.layout.MonthPagerScaffold
+import com.vincent.grainledger.ui.screens.bookkeeping.BookkeepingDialog
 import com.vincent.grainledger.ui.screens.budget.CreateMonthDialog
 import com.vincent.grainledger.ui.screens.transactions.components.TransactionDailyCard
 import com.vincent.grainledger.ui.screens.transactions.components.TransactionMonthSummaryCard
@@ -69,7 +70,7 @@ fun TransactionTreeScreen(
     val availableMonths by viewModel.availableMonths.collectAsState()
     val transactionsMap by viewModel.transactionsMap.collectAsState()
 
-    var pendingDeleteRecord by remember { mutableStateOf<TransactionRecord?>(null) }
+    var editingTransactionRecord by remember { mutableStateOf<TransactionRecord?>(null) }
     var showCreateMonthDialog by remember { mutableStateOf(false) }
     var filterType by remember { mutableIntStateOf(0) } // 0: 全部, 1: 仅支出, 2: 仅收入
 
@@ -87,21 +88,13 @@ fun TransactionTreeScreen(
             showCreateMonthDialog = true
         },
         dialogs = {
-            // 删除记录二次确认弹窗
-            if (pendingDeleteRecord != null) {
-                val record = pendingDeleteRecord!!
-                val isIncome = record.amount > 0
-                val typeName = if (isIncome) "入账" else "支出"
-                val formattedAmount = if (isIncome) "+${MathFormulaEvaluator.formatAmount(record.amount)} ¥" else "-${MathFormulaEvaluator.formatAmount(record.absoluteAmount)} ¥"
-                ConfirmDialog(
-                    title = "删除${typeName}记录",
-                    message = "确定要删除【${record.categoryName} - ${record.detailName}】金额 ${formattedAmount} 的这笔${typeName}记录吗？删除后可用结余将自动反算回补。",
-                    onConfirm = {
-                        viewModel.deleteTransaction(record)
-                        pendingDeleteRecord = null
-                    },
-                    onDismiss = {
-                        pendingDeleteRecord = null
+            // 点击流水记录打开修改/删除弹窗
+            if (editingTransactionRecord != null) {
+                BookkeepingDialog(
+                    viewModel = viewModel,
+                    editingRecord = editingTransactionRecord,
+                    onDismissRequest = {
+                        editingTransactionRecord = null
                     }
                 )
             }
@@ -310,7 +303,7 @@ fun TransactionTreeScreen(
                         day = day,
                         records = dayRecords,
                         onItemClick = { record ->
-                            pendingDeleteRecord = record
+                            editingTransactionRecord = record
                         }
                     )
                 }

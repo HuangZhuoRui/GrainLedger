@@ -432,6 +432,98 @@ class LedgerRepository(context: Context) {
     }
 
     /**
+     * 修改更新一笔交易流水（支持收入或支出记录的金额、分类、细项、日期、账户及备注修改）。
+     * 自动在事务中回退原流水的预算扣减，并联动计算应用更新后流水的预算扣减与双剩余。
+     */
+    suspend fun updateTransaction(
+        originalRecord: TransactionRecord,
+        updatedRecord: TransactionRecord
+    ): Boolean = withContext(Dispatchers.IO) {
+        val success = database.runInTransaction { db ->
+            // 1. 如果原流水是支出，先回退原预算项的已用额度
+            if (originalRecord.amount < 0) {
+                val refundAmount = originalRecord.absoluteAmount
+                val oldBudgetItem = budgetItemDao.findBudgetItem(
+                    originalRecord.year,
+                    originalRecord.month,
+                    originalRecord.categoryName,
+                    originalRecord.detailName,
+                    db
+                )
+                if (oldBudgetItem != null) {
+                    val newSpent = (oldBudgetItem.actualSpent - refundAmount).coerceAtLeast(0.0)
+                    val newBalance = oldBudgetItem.actualAllocated - newSpent
+                    budgetItemDao.updateSpentAndBalance(
+                        itemId = oldBudgetItem.itemId,
+                        actualSpent = newSpent,
+                        balance = newBalance,
+                        db = db
+                    )
+                }
+            }
+
+            // 2. 计算新流水的剩余并应用支出扣减（若新记录是支出）
+            val isIncome = updatedRecord.amount > 0
+            val computedItemRemaining: Double
+            val computedCategoryRemaining: Double
+
+            if (isIncome) {
+                val curTrans = transactionDao.getTransactionsByMonth(updatedRecord.year, updatedRecord.month, db)
+                val curCatIncome = curTrans
+                    .filter { it.recordId != originalRecord.recordId && it.categoryName == updatedRecord.categoryName && it.amount > 0 }
+                    .sumOf { it.amount }
+                computedItemRemaining = updatedRecord.amount
+                computedCategoryRemaining = curCatIncome + updatedRecord.amount
+            } else {
+                val expenseAmount = updatedRecord.absoluteAmount
+                val targetBudgetItem = budgetItemDao.findBudgetItem(
+                    updatedRecord.year,
+                    updatedRecord.month,
+                    updatedRecord.categoryName,
+                    updatedRecord.detailName,
+                    db
+                )
+                if (targetBudgetItem != null) {
+                    val newSpent = targetBudgetItem.actualSpent + expenseAmount
+                    val newBalance = targetBudgetItem.actualAllocated - newSpent
+                    budgetItemDao.updateSpentAndBalance(
+                        itemId = targetBudgetItem.itemId,
+                        actualSpent = newSpent,
+                        balance = newBalance,
+                        db = db
+                    )
+                    computedItemRemaining = newBalance
+                } else {
+                    computedItemRemaining = -expenseAmount
+                }
+
+                val categoryItems = budgetItemDao.getBudgetItemsByMonth(updatedRecord.year, updatedRecord.month, db)
+                    .filter { it.categoryName == updatedRecord.categoryName }
+                val totalAllocated = categoryItems.sumOf { it.actualAllocated }
+                val totalSpent = categoryItems.sumOf { it.actualSpent } + (if (targetBudgetItem == null) expenseAmount else 0.0)
+                computedCategoryRemaining = totalAllocated - totalSpent
+            }
+
+            val finalRecord = updatedRecord.copy(
+                recordId = originalRecord.recordId,
+                itemRemaining = computedItemRemaining,
+                categoryRemaining = computedCategoryRemaining
+            )
+
+            transactionDao.updateTransaction(finalRecord, db) > 0
+        }
+
+        if (success) {
+            invalidateMonthAndFuture(originalRecord.year, originalRecord.month)
+            if (originalRecord.year != updatedRecord.year || originalRecord.month != updatedRecord.month) {
+                invalidateMonthAndFuture(updatedRecord.year, updatedRecord.month)
+            }
+            notifyDataChanged()
+        }
+        success
+    }
+
+    /**
      * 删除一笔交易流水，并在数据库事务中自动反算回补细项与大类的剩余金额。
      */
     suspend fun deleteTransaction(record: TransactionRecord): Boolean = withContext(Dispatchers.IO) {

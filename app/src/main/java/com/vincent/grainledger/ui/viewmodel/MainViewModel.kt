@@ -247,6 +247,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * 修改更新交易流水记录（支持收入与支出）。
+     */
+    fun updateTransaction(originalRecord: TransactionRecord, updatedRecord: TransactionRecord) {
+        viewModelScope.launch {
+            val success = repository.updateTransaction(originalRecord, updatedRecord)
+            if (success) {
+                val typeName = if (updatedRecord.amount > 0) "收入" else "支出"
+                _toastMessage.value = "已更新${typeName}记录！"
+            }
+        }
+    }
+
+    /**
      * 删除指定交易流水。
      */
     fun deleteTransaction(recordId: Long) {

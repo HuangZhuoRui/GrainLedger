@@ -193,6 +193,32 @@ class TransactionDao(private val database: GrainLedgerDatabase) {
     }
 
     /**
+     * 更新单条流水记录。
+     */
+    fun updateTransaction(record: TransactionRecord, db: SQLiteDatabase? = null): Int {
+        val targetDb = db ?: database.writableDatabase
+        val values = ContentValues().apply {
+            put(GrainLedgerDatabase.COL_TRANS_YEAR, record.year)
+            put(GrainLedgerDatabase.COL_TRANS_MONTH, record.month)
+            put(GrainLedgerDatabase.COL_TRANS_DAY, record.day)
+            put(GrainLedgerDatabase.COL_TRANS_CATEGORY, record.categoryName)
+            put(GrainLedgerDatabase.COL_TRANS_ITEM_DETAIL, record.detailName)
+            put(GrainLedgerDatabase.COL_TRANS_AMOUNT, record.amount)
+            put(GrainLedgerDatabase.COL_TRANS_ITEM_REMAINING, record.itemRemaining)
+            put(GrainLedgerDatabase.COL_TRANS_CATEGORY_REMAINING, record.categoryRemaining)
+            put(GrainLedgerDatabase.COL_TRANS_FUNDER, record.funder)
+            put(GrainLedgerDatabase.COL_TRANS_REMARK, record.remark)
+            put(GrainLedgerDatabase.COL_TRANS_TIMESTAMP, record.timestamp)
+        }
+        return targetDb.update(
+            GrainLedgerDatabase.TABLE_TRANSACTIONS,
+            values,
+            "${GrainLedgerDatabase.COL_TRANS_ID} = ?",
+            arrayOf(record.recordId.toString())
+        )
+    }
+
+    /**
      * 根据主键删除流水。
      */
     fun deleteTransaction(recordId: Long, db: SQLiteDatabase? = null): Int {

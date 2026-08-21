@@ -76,6 +76,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.vincent.grainledger.data.model.BudgetItem
+import com.vincent.grainledger.data.model.TransactionRecord
+import com.vincent.grainledger.ui.components.dialog.ConfirmDialog
 import com.vincent.grainledger.ui.screens.category.QuickCreateCategoryDialog
 import com.vincent.grainledger.ui.theme.MiuixAnimation
 import com.vincent.grainledger.ui.theme.MiuixBlue
@@ -95,7 +97,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.absoluteValue
 
 /**
- * MIUIX / HyperOS 风格卡片式横向滑动分步记一笔弹窗 (BookkeepingDialog)。
+ * MIUIX / HyperOS 风格卡片式横向滑动分步记一笔与修改流水弹窗 (BookkeepingDialog)。
  *
  * 核心创新与体验升级：
  * 1. 采用 HorizontalPager 分步卡片流，支持手势 1:1 左右平滑滑动与按键导航；
@@ -103,11 +105,13 @@ import kotlin.math.absoluteValue
  * 3. 顶部步骤指示轴与标题采用同向左右横向滑动与物理缩放 (Slide + Scale + Fade) 联动过渡；
  * 4. 三大步骤卡片高度统一固定为 370.dp，左右切换坚实无跳变；
  * 5. 所有横向滑动区域（分类、标签、月份、日期、账户）边缘增加平滑渐变羽化模糊过渡 (horizontalFadingEdge)；
- * 6. 记账日期 1~31 号滑轨智能居中定位当日或已选日期。
+ * 6. 记账日期 1~31 号滑轨智能居中定位当日或已选日期；
+ * 7. 支持传入 [editingRecord]，实现单笔收入/支出流水的直接修改与二次确认删除。
  */
 @Composable
 fun BookkeepingDialog(
     viewModel: MainViewModel,
+    editingRecord: TransactionRecord? = null,
     onDismissRequest: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -120,16 +124,21 @@ fun BookkeepingDialog(
     val budgetItemList by viewModel.currentBudgetItems.collectAsState()
     val allCategories by viewModel.allCategories.collectAsState()
 
-    var isIncomeMode by remember { mutableStateOf(false) }
-    var selectedTargetMonths by remember(currentYear, currentMonth) {
-        mutableStateOf(setOf(Pair(currentYear, currentMonth)))
+    var isIncomeMode by remember(editingRecord) {
+        mutableStateOf(editingRecord?.let { !it.isExpense } ?: false)
+    }
+    var selectedTargetMonths by remember(currentYear, currentMonth, editingRecord) {
+        mutableStateOf(
+            if (editingRecord != null) setOf(Pair(editingRecord.year, editingRecord.month))
+            else setOf(Pair(currentYear, currentMonth))
+        )
     }
 
     val maxDaysInMonth = remember(currentYear, currentMonth) {
         DateUtils.getDaysInMonth(currentYear, currentMonth)
     }
-    val defaultToday = remember(currentYear, currentMonth) {
-        DateUtils.getCurrentDay().coerceIn(1, maxDaysInMonth)
+    val defaultToday = remember(currentYear, currentMonth, editingRecord) {
+        editingRecord?.day ?: DateUtils.getCurrentDay().coerceIn(1, maxDaysInMonth)
     }
     var transactionDay by remember(defaultToday) {
         mutableIntStateOf(defaultToday)
@@ -156,21 +165,37 @@ fun BookkeepingDialog(
     val expenseCategories = remember(allCategories) { allCategories.filter { !it.isIncome } }
     val incomeCategories = remember(allCategories) { allCategories.filter { it.isIncome } }
 
-    var selectedCategory by remember(allCategories, isIncomeMode) {
+    var selectedCategory by remember(allCategories, isIncomeMode, editingRecord) {
         mutableStateOf(
-            if (isIncomeMode) {
+            editingRecord?.categoryName ?: if (isIncomeMode) {
                 incomeCategories.firstOrNull()?.categoryName ?: "工资薪金"
             } else {
                 expenseCategories.firstOrNull()?.categoryName ?: "强制类"
             }
         )
     }
-    var selectedDetail by remember { mutableStateOf("") }
-    var incomeDetailInput by remember { mutableStateOf("") }
-    var amountInputText by remember { mutableStateOf("") }
-    var funder by remember { mutableStateOf("微信零钱") }
-    var remarkText by remember { mutableStateOf("") }
+    var selectedDetail by remember(editingRecord) {
+        mutableStateOf(editingRecord?.let { if (it.isExpense) it.detailName else "" } ?: "")
+    }
+    var incomeDetailInput by remember(editingRecord) {
+        mutableStateOf(editingRecord?.let { if (!it.isExpense) it.detailName else "" } ?: "")
+    }
+    var amountInputText by remember(editingRecord) {
+        mutableStateOf(
+            if (editingRecord != null) {
+                if (editingRecord.absoluteAmount % 1.0 == 0.0) editingRecord.absoluteAmount.toLong().toString()
+                else String.format(java.util.Locale.US, "%.2f", editingRecord.absoluteAmount)
+            } else ""
+        )
+    }
+    var funder by remember(editingRecord) {
+        mutableStateOf(editingRecord?.funder ?: "微信零钱")
+    }
+    var remarkText by remember(editingRecord) {
+        mutableStateOf(editingRecord?.remark ?: "")
+    }
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
     val currentCategoryExpenseItems = remember(selectedCategory, budgetItemList, isIncomeMode) {
         if (!isIncomeMode) {
@@ -297,10 +322,14 @@ fun BookkeepingDialog(
                         }
                     }
 
-                    // 步骤主副标题 (3D 缩放 + 淡入淡出动画，杜绝生硬与文字截断)
+                    // 步骤主副标题 (左右滑动 + 3D 缩放淡入淡出动画，杜绝生硬与文字截断)
                     val (stepTitle, stepSubtitle) = when (pagerState.currentPage) {
                         0 -> Pair(
-                            if (isIncomeMode) "记一笔收入 · 设定金额" else "记一笔支出 · 设定金额",
+                            if (editingRecord != null) {
+                                if (isIncomeMode) "修改收入 · 设定金额" else "修改支出 · 设定金额"
+                            } else {
+                                if (isIncomeMode) "记一笔收入 · 设定金额" else "记一笔支出 · 设定金额"
+                            },
                             "输入本次款项金额，支持即时算式计算"
                         )
                         1 -> Pair(
@@ -308,7 +337,7 @@ fun BookkeepingDialog(
                             if (isIncomeMode) "选择收入类别与同步月份" else "选择支出大类，查看预算实时消耗与结余演变"
                         )
                         else -> Pair(
-                            "记账属性 · 确认入账",
+                            if (editingRecord != null) "修改属性 · 保存修改" else "记账属性 · 确认入账",
                             "选择记账日期、出资账户与备注说明"
                         )
                     }
@@ -1273,7 +1302,21 @@ fun BookkeepingDialog(
                             Text(text = "上一步", color = MiuixTheme.colorScheme.onSurface, fontSize = 14.sp)
                         }
                     } else {
-                        // 第 1 步时为取消按钮
+                        // 第 1 步时：编辑模式下提供删除，新增模式下提供取消
+                        if (editingRecord != null) {
+                            Button(
+                                onClick = {
+                                    showDeleteConfirmDialog = true
+                                },
+                                modifier = Modifier
+                                    .weight(0.8f)
+                                    .height(48.dp),
+                                colors = ButtonDefaults.buttonColors(color = MiuixRed.copy(alpha = 0.15f))
+                            ) {
+                                Text(text = "删除", color = MiuixRed, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
                         Button(
                             onClick = onDismissRequest,
                             modifier = Modifier
@@ -1294,7 +1337,7 @@ fun BookkeepingDialog(
                                 }
                             },
                             modifier = Modifier
-                                .weight(2f)
+                                .weight(if (editingRecord != null && pagerState.currentPage == 0) 1.4f else 2f)
                                 .height(48.dp),
                             colors = ButtonDefaults.buttonColors(color = activeThemeColor)
                         ) {
@@ -1306,8 +1349,10 @@ fun BookkeepingDialog(
                             )
                         }
                     } else {
-                        // 最终提交按钮
-                        val submitButtonText = if (isIncomeMode) {
+                        // 最终提交/保存按钮
+                        val submitButtonText = if (editingRecord != null) {
+                            "保存修改 $actionAmountString"
+                        } else if (isIncomeMode) {
                             if (selectedTargetMonths.size > 1) {
                                 "确认入账 $actionAmountString（同步 ${selectedTargetMonths.size} 个月）"
                             } else {
@@ -1326,7 +1371,20 @@ fun BookkeepingDialog(
                                         if (selectedDetail.isNotEmpty()) selectedDetail else "日常支出"
                                     }
 
-                                    if (isIncomeMode) {
+                                    if (editingRecord != null) {
+                                        val finalAmount = if (isIncomeMode) evaluatedAmount else -evaluatedAmount
+                                        val updated = editingRecord.copy(
+                                            year = currentYear,
+                                            month = currentMonth,
+                                            day = transactionDay,
+                                            categoryName = selectedCategory,
+                                            detailName = finalDetail,
+                                            amount = finalAmount,
+                                            funder = funder.ifBlank { "默认账户" },
+                                            remark = remarkText.trim()
+                                        )
+                                        viewModel.updateTransaction(editingRecord, updated)
+                                    } else if (isIncomeMode) {
                                         val targetMonthsList = selectedTargetMonths.toList()
                                         viewModel.recordTransactionsMultiMonths(
                                             targetMonths = targetMonthsList,
@@ -1368,6 +1426,25 @@ fun BookkeepingDialog(
                         }
                     }
                 }
+            }
+
+            // 删除流水记录二次确认弹窗
+            if (showDeleteConfirmDialog && editingRecord != null) {
+                val isIncome = editingRecord.amount > 0
+                val typeName = if (isIncome) "入账" else "支出"
+                val formattedAmount = if (isIncome) "+${MathFormulaEvaluator.formatAmount(editingRecord.amount)} ¥" else "-${MathFormulaEvaluator.formatAmount(editingRecord.absoluteAmount)} ¥"
+                ConfirmDialog(
+                    title = "删除${typeName}记录",
+                    message = "确定要删除【${editingRecord.categoryName} - ${editingRecord.detailName}】金额 ${formattedAmount} 的这笔${typeName}记录吗？删除后可用结余将自动反算回补。",
+                    onConfirm = {
+                        viewModel.deleteTransaction(editingRecord)
+                        showDeleteConfirmDialog = false
+                        onDismissRequest()
+                    },
+                    onDismiss = {
+                        showDeleteConfirmDialog = false
+                    }
+                )
             }
 
             // 原地新建分类弹窗

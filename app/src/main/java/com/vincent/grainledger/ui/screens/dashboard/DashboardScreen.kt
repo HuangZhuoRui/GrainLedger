@@ -29,11 +29,13 @@ import androidx.compose.ui.unit.sp
 import com.vincent.grainledger.data.model.BalanceCheckResult
 import com.vincent.grainledger.data.model.BudgetItem
 import com.vincent.grainledger.data.model.MonthlyOverview
+import com.vincent.grainledger.data.model.TransactionRecord
 import com.vincent.grainledger.ui.components.card.BudgetEnvelopeCard
 import com.vincent.grainledger.ui.components.card.CapitalBalanceCard
 import com.vincent.grainledger.ui.components.card.IncomeEnvelopeCard
 import com.vincent.grainledger.ui.components.layout.MonthPagerScaffold
 import com.vincent.grainledger.ui.components.layout.SectionHeader
+import com.vincent.grainledger.ui.screens.bookkeeping.BookkeepingDialog
 import com.vincent.grainledger.ui.screens.budget.CreateMonthDialog
 import com.vincent.grainledger.ui.screens.dashboard.components.MonthlyAssetOverviewCard
 import com.vincent.grainledger.ui.theme.MiuixBlue
@@ -70,6 +72,7 @@ fun DashboardScreen(
     val categoryMap = remember(allCategories) { allCategories.associateBy { it.categoryName } }
 
     var showCreateMonthDialog by remember { mutableStateOf(false) }
+    var editingIncomeRecord by remember { mutableStateOf<TransactionRecord?>(null) }
 
     MonthPagerScaffold(
         availableMonths = availableMonths,
@@ -110,6 +113,17 @@ fun DashboardScreen(
             }
         },
         dialogs = {
+            // 修改/删除收入流水记录弹窗
+            if (editingIncomeRecord != null) {
+                BookkeepingDialog(
+                    viewModel = viewModel,
+                    editingRecord = editingIncomeRecord,
+                    onDismissRequest = {
+                        editingIncomeRecord = null
+                    }
+                )
+            }
+
             if (showCreateMonthDialog) {
                 CreateMonthDialog(
                     currentYear = currentYear,
@@ -172,7 +186,10 @@ fun DashboardScreen(
                 items(itemOverview.incomeOverviewList, key = { it.categoryName }) { incomeOverview ->
                     IncomeEnvelopeCard(
                         incomeOverview = incomeOverview,
-                        categoryDefinition = categoryMap[incomeOverview.categoryName]
+                        categoryDefinition = categoryMap[incomeOverview.categoryName],
+                        onTransactionClick = { transaction ->
+                            editingIncomeRecord = transaction
+                        }
                     )
                 }
             }
